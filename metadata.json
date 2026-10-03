@@ -1,0 +1,8 @@
+{
+  "name": "Remix Alif-World",
+  "description": "Seamlessly import your GitHub repository and initialize your Google AI Studio project with a single command.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,16 @@
+# Render Blueprint specification for Alif-World Portfolio
+# Deploy automatically with 1-click via Render Blueprints (https://dashboard.render.com/blueprints)
+services:
+  - type: web
+    name: alif-world-portfolio
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    # Crucial for React Router SPA (prevents 404 on page refresh for /projects, /journey, /explore-works, etc.)
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
