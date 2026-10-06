@@ -6,3 +6,26 @@
   --font-hand: "Gochi Hand", cursive;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
+
+@keyframes cursorBubbleFloat {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+    transform: translate(calc(-50% + var(--wobble-x, 0px) * 0.3), -70%) scale(1);
+  }
+  70% {
+    opacity: 0.7;
+    transform: translate(calc(-50% + var(--wobble-x, 0px)), -150%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--wobble-x, 0px) * 1.3), -220%) scale(0.6);
+  }
+}
+
+.animate-cursor-bubble {
+  animation: cursorBubbleFloat 0.85s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
+}

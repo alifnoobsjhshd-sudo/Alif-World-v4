@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles } from 'lucide-react';
+import { dreamAudio } from '../utils/audio';
 
 // Volumetric clouds parting outward gracefully to reveal Scene 01 (GPU optimized)
 const PARTING_CLOUD_CLUSTERS = [
@@ -26,6 +27,8 @@ export const JourneyCloudOut: React.FC = () => {
   const [stage, setStage] = useState<'covering' | 'parting' | 'done'>('covering');
 
   useEffect(() => {
+    dreamAudio.playCloudWhoosh();
+
     // Begin parting clouds quickly after mount (~200ms)
     const partTimer = setTimeout(() => {
       setStage('parting');

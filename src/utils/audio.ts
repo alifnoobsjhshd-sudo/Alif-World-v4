@@ -976,13 +976,17 @@ class SkyAudioPlayer {
 
     try {
       this.bgmMasterGain.gain.cancelScheduledValues(now);
-      this.bgmMasterGain.gain.setValueAtTime(this.bgmMasterGain.gain.value, now);
-      this.bgmMasterGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
+      if (fadeDuration <= 0.05) {
+        this.bgmMasterGain.gain.setValueAtTime(0.00001, now);
+        this.cleanupJourneyMusic();
+      } else {
+        this.bgmMasterGain.gain.setValueAtTime(this.bgmMasterGain.gain.value, now);
+        this.bgmMasterGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
+        setTimeout(() => {
+          this.cleanupJourneyMusic();
+        }, fadeDuration * 1000 + 100);
+      }
     } catch {}
-
-    setTimeout(() => {
-      this.cleanupJourneyMusic();
-    }, fadeDuration * 1000 + 100);
   }
 
   private cleanupJourneyMusic() {
@@ -1651,6 +1655,14 @@ class SkyAudioPlayer {
   // Toggle Mute
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    if (this.underwaterAudioElement) {
+      this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.55;
+      if (this.isMuted) {
+        this.underwaterAudioElement.pause();
+      } else {
+        this.underwaterAudioElement.play().catch(() => {});
+      }
+    }
     if (this.ctx) {
       const now = this.ctx.currentTime;
       if (this.bgmMasterGain) {
@@ -2410,6 +2422,7 @@ class SkyAudioPlayer {
   private underwaterPadGain: GainNode | null = null;
   private underwaterPadOscs: OscillatorNode[] = [];
   private underwaterMelodyTimer: ReturnType<typeof setInterval> | null = null;
+  private underwaterWhaleTimer: ReturnType<typeof setInterval> | null = null;
 
   public startUnderwaterMusic(): void {
     this.startUnderwaterAmbience();
@@ -2419,7 +2432,41 @@ class SkyAudioPlayer {
     this.stopUnderwaterAmbience(fadeDuration);
   }
 
+  public stopAllNonUnderwaterMusic(): void {
+    this.stopJourneyMusic(0);
+    this.cleanupJourneyMusic();
+    this.stopWorldSkyMusic(0);
+    this.stopSpaceAmbientMusic(0);
+    this.stopSleepingSounds();
+  }
+
+  // ── REAL DEEP UNDERWATER BACKGROUND MUSIC ──────────────────────────────────
+  // Dedicated authentic deep-sea soundscape: heavy sub-bass drone, muffled ocean current wash,
+  // submerged lowpassed ambient pads, distant abyss sonar echoes, and deep whale calls.
+  // Guarantees World Sky Music and Space Ambient Soundtrack are immediately halted.
+  private underwaterCurrentNode: AudioBufferSourceNode | null = null;
+  private underwaterSonarTimer: ReturnType<typeof setInterval> | null = null;
+  private underwaterAudioElement: HTMLAudioElement | null = null;
+
   public startUnderwaterAmbience(): void {
+    // 1. Immediately kill any World Page sky music, journey music, or space soundtrack
+    this.stopAllNonUnderwaterMusic();
+
+    // 2. Play attached user underwater background music track
+    if (typeof Audio !== 'undefined') {
+      try {
+        if (!this.underwaterAudioElement) {
+          this.underwaterAudioElement = new Audio('/underwater-background-music.mp3');
+          this.underwaterAudioElement.loop = true;
+          this.underwaterAudioElement.preload = 'auto';
+        }
+        this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.65;
+        if (!this.isMuted) {
+          this.underwaterAudioElement.play().catch(() => {});
+        }
+      } catch {}
+    }
+
     if (this.isMuted) return;
     this.initContext();
     if (!this.ctx) return;
@@ -2430,50 +2477,101 @@ class SkyAudioPlayer {
       const now = this.ctx.currentTime;
       this.underwaterGain = this.ctx.createGain();
       this.underwaterGain.gain.setValueAtTime(0.001, now);
-      this.underwaterGain.gain.linearRampToValueAtTime(0.09, now + 1.8);
+      this.underwaterGain.gain.linearRampToValueAtTime(0.12, now + 2.0);
 
-      // 1. Low aquatic rumble drone (A1 = 55Hz)
+      // 1. Deep Oceanic Sub-Bass Trench Drone (42Hz - 75Hz)
       this.underwaterOsc = this.ctx.createOscillator();
       this.underwaterOsc.type = 'sine';
-      this.underwaterOsc.frequency.setValueAtTime(55, now);
+      this.underwaterOsc.frequency.setValueAtTime(44, now);
 
-      // Aquatic lowpass filter with slow wave modulation
       this.underwaterFilter = this.ctx.createBiquadFilter();
       this.underwaterFilter.type = 'lowpass';
-      this.underwaterFilter.frequency.setValueAtTime(260, now);
-      this.underwaterFilter.Q.setValueAtTime(2.2, now);
+      this.underwaterFilter.frequency.setValueAtTime(140, now);
+      this.underwaterFilter.Q.setValueAtTime(2.8, now);
 
       this.underwaterLfo = this.ctx.createOscillator();
       this.underwaterLfo.type = 'sine';
-      this.underwaterLfo.frequency.setValueAtTime(0.16, now); // ~6.2s wave cycle
+      this.underwaterLfo.frequency.setValueAtTime(0.08, now); // ~12s slow tidal breathing cycle
 
       const lfoGain = this.ctx.createGain();
-      lfoGain.gain.setValueAtTime(110, now);
+      lfoGain.gain.setValueAtTime(60, now);
       this.underwaterLfo.connect(lfoGain);
       lfoGain.connect(this.underwaterFilter.frequency);
 
       this.underwaterOsc.connect(this.underwaterFilter);
       this.underwaterFilter.connect(this.underwaterGain);
 
-      // 2. Ethereal Sub-aquatic Coral Pad (Lush Dm9 / Fmaj7 chord: D3, F3, A3, C4, E4)
+      // 2. Muffled Underwater Current Wash (Submerged Pink Noise Current)
+      const bufferSize = this.ctx.sampleRate * 4;
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99 * b0 + white * 0.05;
+        b1 = 0.95 * b1 + white * 0.08;
+        b2 = 0.85 * b2 + white * 0.15;
+        data[i] = (b0 + b1 + b2) * 0.08;
+      }
+      this.underwaterCurrentNode = this.ctx.createBufferSource();
+      this.underwaterCurrentNode.buffer = noiseBuffer;
+      this.underwaterCurrentNode.loop = true;
+
+      const currentFilter = this.ctx.createBiquadFilter();
+      currentFilter.type = 'lowpass';
+      currentFilter.frequency.setValueAtTime(190, now);
+      currentFilter.Q.setValueAtTime(2.0, now);
+
+      const currentGain = this.ctx.createGain();
+      currentGain.gain.setValueAtTime(0.085, now);
+
+      this.underwaterCurrentNode.connect(currentFilter);
+      currentFilter.connect(currentGain);
+      currentGain.connect(this.underwaterGain);
+      this.underwaterCurrentNode.start(now);
+
+      // 3. Submerged Oceanic Chords (Heavy lowpass: D2, F2, A2, C3)
       this.underwaterPadGain = this.ctx.createGain();
       this.underwaterPadGain.gain.setValueAtTime(0.001, now);
-      this.underwaterPadGain.gain.linearRampToValueAtTime(0.055, now + 2.5);
+      this.underwaterPadGain.gain.linearRampToValueAtTime(0.075, now + 2.8);
 
       const padFilter = this.ctx.createBiquadFilter();
       padFilter.type = 'lowpass';
-      padFilter.frequency.setValueAtTime(420, now);
-      padFilter.Q.setValueAtTime(1.5, now);
+      padFilter.frequency.setValueAtTime(240, now); // strictly low, no bright frequencies
+      padFilter.Q.setValueAtTime(1.8, now);
 
-      const chordFreqs = [146.83, 174.61, 220.00, 261.63, 329.63]; // D3, F3, A3, C4, E4
-      this.underwaterPadOscs = chordFreqs.map((freq, idx) => {
+      // Submerged low deep-water chords: Dm -> Bb -> F -> Gm
+      const deepOceanChords = [
+        [73.42, 87.31, 110.00, 130.81],  // D2, F2, A2, C3 (Dm7)
+        [58.27, 87.31, 116.54, 130.81],  // Bb1, F2, Bb2, C3 (Bb)
+        [87.31, 110.00, 130.81, 174.61], // F2, A2, C3, F3 (F)
+        [49.00, 73.42, 87.31, 110.00],   // G1, D2, F2, A2 (Gm)
+      ];
+      let chordIndex = 0;
+
+      this.underwaterPadOscs = deepOceanChords[0].map((freq, idx) => {
         const osc = this.ctx!.createOscillator();
-        osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 0.8, now); // subtle detune
+        osc.type = idx === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 0.4, now);
         osc.connect(padFilter);
         osc.start(now);
         return osc;
       });
+
+      // Slow majestic chord cycle every 8.5 seconds
+      const chordCycleInterval = setInterval(() => {
+        if (!this.underwaterGain || !this.ctx || this.isMuted) return;
+        try {
+          chordIndex = (chordIndex + 1) % deepOceanChords.length;
+          const nextChord = deepOceanChords[chordIndex];
+          const t = this.ctx.currentTime;
+          this.underwaterPadOscs.forEach((osc, idx) => {
+            if (nextChord[idx]) {
+              osc.frequency.exponentialRampToValueAtTime(nextChord[idx], t + 3.8);
+            }
+          });
+        } catch {}
+      }, 8500);
 
       padFilter.connect(this.underwaterPadGain);
       this.underwaterPadGain.connect(this.underwaterGain);
@@ -2482,44 +2580,105 @@ class SkyAudioPlayer {
       this.underwaterOsc.start(now);
       this.underwaterLfo.start(now);
 
-      // 3. Gentle Underwater Kalimba / Coral Droplet Arpeggio Lullaby
-      const dropletNotes = [349.23, 392.00, 440.00, 523.25, 587.33, 659.25]; // F4, G4, A4, C5, D5, E5
-      if (this.underwaterMelodyTimer) clearInterval(this.underwaterMelodyTimer);
-      this.underwaterMelodyTimer = setInterval(() => {
+      // 4. Distant Submerged Sonar Ping Echo (Every 6.8 seconds)
+      if (this.underwaterSonarTimer) clearInterval(this.underwaterSonarTimer);
+      this.underwaterSonarTimer = setInterval(() => {
         if (!this.underwaterGain || !this.ctx || this.isMuted) return;
         try {
           const t = this.ctx.currentTime;
-          const noteOsc = this.ctx.createOscillator();
-          const noteGain = this.ctx.createGain();
-          const noteFilter = this.ctx.createBiquadFilter();
+          const sonarOsc = this.ctx.createOscillator();
+          const sonarGain = this.ctx.createGain();
+          const sonarFilter = this.ctx.createBiquadFilter();
 
-          const f = dropletNotes[Math.floor(Math.random() * dropletNotes.length)];
-          noteOsc.type = 'sine';
-          noteOsc.frequency.setValueAtTime(f, t);
+          sonarOsc.type = 'sine';
+          sonarOsc.frequency.setValueAtTime(220, t); // Sonar pitch
 
-          noteFilter.type = 'lowpass';
-          noteFilter.frequency.setValueAtTime(800, t);
-          noteFilter.frequency.exponentialRampToValueAtTime(300, t + 0.9);
+          sonarFilter.type = 'bandpass';
+          sonarFilter.frequency.setValueAtTime(220, t);
+          sonarFilter.Q.setValueAtTime(8.0, t);
 
-          noteGain.gain.setValueAtTime(0.001, t);
-          noteGain.gain.linearRampToValueAtTime(0.032, t + 0.04);
-          noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+          sonarGain.gain.setValueAtTime(0.0001, t);
+          sonarGain.gain.linearRampToValueAtTime(0.025, t + 0.05);
+          sonarGain.gain.exponentialRampToValueAtTime(0.00001, t + 2.8);
 
-          noteOsc.connect(noteFilter);
-          noteFilter.connect(noteGain);
-          noteGain.connect(this.underwaterGain);
+          sonarOsc.connect(sonarFilter);
+          sonarFilter.connect(sonarGain);
+          sonarGain.connect(this.underwaterGain);
 
-          noteOsc.start(t);
-          noteOsc.stop(t + 1.25);
+          sonarOsc.start(t);
+          sonarOsc.stop(t + 2.85);
         } catch {}
-      }, 1600);
+      }, 6800);
+
+      // 5. Distant Low Abyss Whale Call (75Hz - 130Hz deep sea moan)
+      if (this.underwaterWhaleTimer) clearInterval(this.underwaterWhaleTimer);
+      this.underwaterWhaleTimer = setInterval(() => {
+        if (!this.underwaterGain || !this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const whaleOsc = this.ctx.createOscillator();
+          const whaleGain = this.ctx.createGain();
+          const whaleFilter = this.ctx.createBiquadFilter();
+
+          whaleOsc.type = 'sine';
+          const startF = 85 + Math.random() * 30;
+          const endF = startF * (Math.random() > 0.5 ? 1.35 : 0.75);
+          whaleOsc.frequency.setValueAtTime(startF, t);
+          whaleOsc.frequency.exponentialRampToValueAtTime(endF, t + 3.2);
+
+          whaleFilter.type = 'lowpass';
+          whaleFilter.frequency.setValueAtTime(160, t);
+          whaleFilter.Q.setValueAtTime(3.2, t);
+
+          whaleGain.gain.setValueAtTime(0.0001, t);
+          whaleGain.gain.linearRampToValueAtTime(0.032, t + 1.0);
+          whaleGain.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+
+          whaleOsc.connect(whaleFilter);
+          whaleFilter.connect(whaleGain);
+          whaleGain.connect(this.underwaterGain);
+
+          whaleOsc.start(t);
+          whaleOsc.stop(t + 3.85);
+        } catch {}
+      }, 7600);
     } catch {}
   }
 
   public stopUnderwaterAmbience(fadeDuration: number = 1.0): void {
+    if (this.underwaterAudioElement) {
+      try {
+        if (fadeDuration <= 0.1) {
+          this.underwaterAudioElement.pause();
+          this.underwaterAudioElement.currentTime = 0;
+        } else {
+          const el = this.underwaterAudioElement;
+          const startVol = el.volume;
+          const steps = 8;
+          let step = 0;
+          const timer = setInterval(() => {
+            step++;
+            el.volume = Math.max(0, startVol * (1 - step / steps));
+            if (step >= steps) {
+              clearInterval(timer);
+              el.pause();
+            }
+          }, (fadeDuration * 1000) / steps);
+        }
+      } catch {}
+    }
+
     if (this.underwaterMelodyTimer) {
       clearInterval(this.underwaterMelodyTimer);
       this.underwaterMelodyTimer = null;
+    }
+    if (this.underwaterSonarTimer) {
+      clearInterval(this.underwaterSonarTimer);
+      this.underwaterSonarTimer = null;
+    }
+    if (this.underwaterWhaleTimer) {
+      clearInterval(this.underwaterWhaleTimer);
+      this.underwaterWhaleTimer = null;
     }
     if (!this.underwaterGain || !this.ctx) return;
     try {
@@ -2527,6 +2686,8 @@ class SkyAudioPlayer {
       this.underwaterGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
       setTimeout(() => {
         try {
+          this.underwaterCurrentNode?.stop();
+          this.underwaterCurrentNode?.disconnect();
           this.underwaterOsc?.stop();
           this.underwaterLfo?.stop();
           this.underwaterOsc?.disconnect();
@@ -2539,6 +2700,7 @@ class SkyAudioPlayer {
           this.underwaterGain?.disconnect();
           this.underwaterFilter?.disconnect();
         } catch {}
+        this.underwaterCurrentNode = null;
         this.underwaterOsc = null;
         this.underwaterLfo = null;
         this.underwaterGain = null;
@@ -2552,7 +2714,9 @@ class SkyAudioPlayer {
   private worldSkyGain: GainNode | null = null;
   private worldSkyWind: AudioBufferSourceNode | null = null;
   private worldSkyPadOscs: OscillatorNode[] = [];
+  private worldSkyPadGain: GainNode | null = null;
   private worldSkyChimeTimer: ReturnType<typeof setInterval> | null = null;
+  private worldSkyHarpTimer: ReturnType<typeof setInterval> | null = null;
 
   public startWorldSkyMusic(): void {
     if (this.isMuted) return;
@@ -2565,9 +2729,9 @@ class SkyAudioPlayer {
       const now = this.ctx.currentTime;
       this.worldSkyGain = this.ctx.createGain();
       this.worldSkyGain.gain.setValueAtTime(0.001, now);
-      this.worldSkyGain.gain.linearRampToValueAtTime(0.08, now + 1.8);
+      this.worldSkyGain.gain.linearRampToValueAtTime(0.09, now + 1.8);
 
-      // 1. High Altitude Organic Sky Wind Stream
+      // 1. High Altitude Organic Sky Wind Stream (Stereo Pink Noise)
       const bufferSize = this.ctx.sampleRate * 4;
       const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -2603,7 +2767,7 @@ class SkyAudioPlayer {
       windLfoGain.connect(windFilter.frequency);
 
       const windVol = this.ctx.createGain();
-      windVol.gain.setValueAtTime(0.42, now);
+      windVol.gain.setValueAtTime(0.38, now);
       this.worldSkyWind.connect(windFilter);
       windFilter.connect(windVol);
       windVol.connect(this.worldSkyGain);
@@ -2611,30 +2775,84 @@ class SkyAudioPlayer {
       this.worldSkyWind.start(now);
       windLfo.start(now);
 
-      // 2. Ethereal Celestial Sky Pad (Open 5ths in D: D3, A3, D4, F#4, A4)
+      // 2. Ethereal Celestial Sky Pad (Dmaj9 - Gmaj7 open harmony)
+      this.worldSkyPadGain = this.ctx.createGain();
+      this.worldSkyPadGain.gain.setValueAtTime(0.001, now);
+      this.worldSkyPadGain.gain.linearRampToValueAtTime(0.065, now + 2.0);
+
       const skyPadFilter = this.ctx.createBiquadFilter();
       skyPadFilter.type = 'lowpass';
-      skyPadFilter.frequency.setValueAtTime(620, now);
+      skyPadFilter.frequency.setValueAtTime(680, now);
       skyPadFilter.Q.setValueAtTime(1.2, now);
 
-      const skyChord = [146.83, 220.00, 293.66, 369.99, 440.00];
+      const skyChord = [146.83, 220.00, 293.66, 369.99, 440.00, 554.37]; // D3, A3, D4, F#4, A4, C#5
       this.worldSkyPadOscs = skyChord.map((freq, i) => {
         const osc = this.ctx!.createOscillator();
         osc.type = i % 2 === 0 ? 'sine' : 'triangle';
-        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 0.6, now);
+        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 0.7, now);
         const oscGain = this.ctx!.createGain();
-        oscGain.gain.setValueAtTime(0.18, now);
+        oscGain.gain.setValueAtTime(0.16, now);
         osc.connect(oscGain);
         oscGain.connect(skyPadFilter);
         osc.start(now);
         return osc;
       });
 
-      skyPadFilter.connect(this.worldSkyGain);
+      skyPadFilter.connect(this.worldSkyPadGain);
+      this.worldSkyPadGain.connect(this.worldSkyGain);
       this.worldSkyGain.connect(this.ctx.destination);
 
-      // 3. Gentle Celestial Cloud Bell Chimes
-      const skyChimes = [587.33, 659.25, 739.99, 880.00, 987.77, 1174.66]; // D5, E5, F#5, A5, B5, D6
+      // 3. Melodic Celestial Harp & Cloud Bell Arpeggio (D Major Pentatonic)
+      const harpProgression = [
+        [293.66, 369.99, 440.00, 587.33], // D4, F#4, A4, D5 (Dmaj)
+        [392.00, 440.00, 493.88, 587.33], // G4, A4, B4, D5  (Gmaj)
+        [493.88, 554.37, 587.33, 739.99], // B4, C#5, D5, F#5 (Bm7)
+        [440.00, 493.88, 554.37, 659.25], // A4, B4, C#5, E5  (Asus4)
+      ];
+      let barIndex = 0;
+      let noteInBar = 0;
+
+      if (this.worldSkyHarpTimer) clearInterval(this.worldSkyHarpTimer);
+      this.worldSkyHarpTimer = setInterval(() => {
+        if (!this.worldSkyGain || !this.ctx || this.isMuted) return;
+        try {
+          const t = this.ctx.currentTime;
+          const currentChord = harpProgression[barIndex];
+          const freq = currentChord[noteInBar % currentChord.length];
+
+          // Gentle acoustic harp pluck oscillator
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, t);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1400, t);
+          filter.frequency.exponentialRampToValueAtTime(450, t + 0.8);
+
+          gain.gain.setValueAtTime(0.001, t);
+          gain.gain.linearRampToValueAtTime(0.042, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.worldSkyGain);
+
+          osc.start(t);
+          osc.stop(t + 1.45);
+
+          noteInBar++;
+          if (noteInBar >= 4) {
+            noteInBar = 0;
+            barIndex = (barIndex + 1) % harpProgression.length;
+          }
+        } catch {}
+      }, 720);
+
+      // 4. Sparkling High Wind Chimes (Occasional random celestial accents)
+      const skyChimes = [739.99, 880.00, 987.77, 1174.66, 1318.51]; // F#5, A5, B5, D6, E6
       if (this.worldSkyChimeTimer) clearInterval(this.worldSkyChimeTimer);
       this.worldSkyChimeTimer = setInterval(() => {
         if (!this.worldSkyGain || !this.ctx || this.isMuted) return;
@@ -2648,16 +2866,16 @@ class SkyAudioPlayer {
           osc.frequency.setValueAtTime(f, t);
 
           gain.gain.setValueAtTime(0.001, t);
-          gain.gain.linearRampToValueAtTime(0.038, t + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+          gain.gain.linearRampToValueAtTime(0.028, t + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
 
           osc.connect(gain);
           gain.connect(this.worldSkyGain);
 
           osc.start(t);
-          osc.stop(t + 1.85);
+          osc.stop(t + 2.05);
         } catch {}
-      }, 2400);
+      }, 3400);
     } catch {}
   }
 
@@ -2666,11 +2884,16 @@ class SkyAudioPlayer {
       clearInterval(this.worldSkyChimeTimer);
       this.worldSkyChimeTimer = null;
     }
+    if (this.worldSkyHarpTimer) {
+      clearInterval(this.worldSkyHarpTimer);
+      this.worldSkyHarpTimer = null;
+    }
     if (!this.worldSkyGain || !this.ctx) return;
     try {
       const now = this.ctx.currentTime;
-      this.worldSkyGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
-      setTimeout(() => {
+      this.worldSkyGain.gain.cancelScheduledValues(now);
+
+      const killNodes = () => {
         try {
           this.worldSkyWind?.stop();
           this.worldSkyWind?.disconnect();
@@ -2678,11 +2901,22 @@ class SkyAudioPlayer {
             try { o.stop(); o.disconnect(); } catch {}
           });
           this.worldSkyPadOscs = [];
+          this.worldSkyPadGain?.disconnect();
           this.worldSkyGain?.disconnect();
         } catch {}
         this.worldSkyWind = null;
         this.worldSkyGain = null;
-      }, fadeDuration * 1000 + 50);
+        this.worldSkyPadGain = null;
+      };
+
+      if (fadeDuration <= 0.05) {
+        this.worldSkyGain.gain.setValueAtTime(0.00001, now);
+        killNodes();
+      } else {
+        this.worldSkyGain.gain.setValueAtTime(this.worldSkyGain.gain.value, now);
+        this.worldSkyGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
+        setTimeout(killNodes, fadeDuration * 1000 + 50);
+      }
     } catch {}
   }
 
@@ -2805,6 +3039,214 @@ class SkyAudioPlayer {
 
       osc.start(now);
       osc.stop(now + 0.18);
+    } catch {}
+  }
+
+  // ── CONTINUOUS SCROLLING BUBBLE SOUND STREAM ──────────────────────────────
+  // Naturally streams organic, soft water bubbles for as long as user is scrolling
+  private scrollBubbleTimer: ReturnType<typeof setTimeout> | null = null;
+  private isScrollBubbling = false;
+  private lastScrollBubbleVelocity = 0;
+  private scrollBubbleStopTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  public updateScrollingBubbleSound(velocity: number): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const absVel = Math.abs(velocity);
+    this.lastScrollBubbleVelocity = absVel;
+
+    if (absVel > 6) {
+      if (this.scrollBubbleStopTimeout) {
+        clearTimeout(this.scrollBubbleStopTimeout);
+        this.scrollBubbleStopTimeout = null;
+      }
+
+      if (!this.isScrollBubbling) {
+        this.isScrollBubbling = true;
+        this.scheduleNextScrollBubble();
+      }
+    } else {
+      if (this.isScrollBubbling && !this.scrollBubbleStopTimeout) {
+        this.scrollBubbleStopTimeout = setTimeout(() => {
+          this.stopScrollingBubbleSound();
+        }, 160);
+      }
+    }
+  }
+
+  private scheduleNextScrollBubble(): void {
+    if (!this.isScrollBubbling || !this.ctx || this.isMuted) return;
+
+    try {
+      this.playNaturalBubblePop(this.lastScrollBubbleVelocity);
+    } catch {}
+
+    // Dynamic interval: faster scroll = lively bubbling (45ms - 75ms)
+    // slower scroll = gentle bubbling (85ms - 135ms)
+    const baseInterval = Math.max(45, 130 - Math.min(85, this.lastScrollBubbleVelocity * 0.35));
+    // Organic jitter prevents repetitive machine-gun rhythm
+    const jitter = (Math.random() - 0.5) * 30;
+    const interval = Math.max(38, baseInterval + jitter);
+
+    this.scrollBubbleTimer = setTimeout(() => {
+      this.scheduleNextScrollBubble();
+    }, interval);
+  }
+
+  public stopScrollingBubbleSound(): void {
+    this.isScrollBubbling = false;
+    if (this.scrollBubbleTimer) {
+      clearTimeout(this.scrollBubbleTimer);
+      this.scrollBubbleTimer = null;
+    }
+    if (this.scrollBubbleStopTimeout) {
+      clearTimeout(this.scrollBubbleStopTimeout);
+      this.scrollBubbleStopTimeout = null;
+    }
+  }
+
+  // Plays a single natural organic bubble pop with pitch sweep and soft lowpass envelope
+  private playNaturalBubblePop(velocity: number = 20): void {
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      // Organic liquid bubble frequencies across 3 octaves (320Hz to 880Hz)
+      const bubbleFrequencies = [340, 410, 480, 560, 630, 720, 800, 890];
+      const baseFreq = bubbleFrequencies[Math.floor(Math.random() * bubbleFrequencies.length)] * (0.92 + Math.random() * 0.16);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq, now);
+      // Upward pitch flare simulates water surface tension release
+      const sweepFactor = 1.4 + Math.random() * 0.45;
+      const duration = 0.05 + Math.random() * 0.035; // 50ms - 85ms
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * sweepFactor, now + duration * 0.85);
+
+      // Lowpass resonant filter keeps bubbles submerged and liquid
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1300, now);
+      filter.frequency.exponentialRampToValueAtTime(650, now + duration);
+      filter.Q.setValueAtTime(2.2, now);
+
+      // Gentle, soothing volume envelope
+      const vol = Math.min(0.048, 0.02 + Math.min(0.028, velocity * 0.0003));
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(filter);
+
+      if (typeof this.ctx.createStereoPanner === 'function') {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.setValueAtTime((Math.random() - 0.5) * 0.6, now);
+        filter.connect(panner);
+        panner.connect(gain);
+      } else {
+        filter.connect(gain);
+      }
+
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    } catch {}
+  }
+
+  // ── SYNCHRONIZED BUBBLE PARTICLE POP ─────────────────────────────────────
+  // Exactly matches each floating bubble particle emitted behind the fish
+  public playSynchronizedBubble(sizePx: number = 14, panX: number = 0): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      // Pitch is inversely proportional to bubble size:
+      // Small bubbles (~6px) -> ~780Hz "bloop"
+      // Large bubbles (~24px) -> ~360Hz "blup"
+      const sizeNorm = Math.max(0, Math.min(1, (sizePx - 6) / 18));
+      const baseFreq = (780 - sizeNorm * 410) + (Math.random() - 0.5) * 50;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq, now);
+      // Fast exponential upward pop sweep
+      const sweepFactor = 1.45 + (1 - sizeNorm) * 0.35;
+      const duration = 0.045 + sizeNorm * 0.035;
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * sweepFactor, now + duration * 0.85);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400 - sizeNorm * 450, now);
+      filter.Q.setValueAtTime(2.4, now);
+
+      const vol = 0.032 + sizeNorm * 0.022;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(filter);
+
+      if (typeof this.ctx.createStereoPanner === 'function') {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, panX)), now);
+        filter.connect(panner);
+        panner.connect(gain);
+      } else {
+        filter.connect(gain);
+      }
+
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    } catch {}
+  }
+
+  // ── WORLD TRANSITIONS SFX ──────────────────────────────────────────────
+  // Rising submerged bubbles surge for About Me transition
+  public playSubmergedBubbleCover(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      // Staggered cascade of 14 blooping aquatic bubbles + low water rush
+      for (let i = 0; i < 14; i++) {
+        setTimeout(() => {
+          if (!this.ctx || this.isMuted) return;
+          this.playUnderwaterBubble(0.85 + Math.random() * 0.5);
+        }, i * 110);
+      }
+
+      const now = this.ctx.currentTime;
+      const duration = 2.2;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.getNoiseBuffer(this.ctx);
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(140, now);
+      filter.frequency.linearRampToValueAtTime(380, now + duration * 0.6);
+      filter.frequency.exponentialRampToValueAtTime(160, now + duration);
+      filter.Q.setValueAtTime(3.0, now);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + duration * 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      noise.start(now);
+      noise.stop(now + duration + 0.1);
     } catch {}
   }
 }

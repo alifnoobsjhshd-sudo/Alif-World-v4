@@ -17,9 +17,11 @@ import { SEO } from '../components/SEO';
 import { MarineScene } from '../components/MarineScene';
 import { MarineFish } from '../components/MarineFish';
 import { MarineBackground } from '../components/MarineBackground';
-import { MarineBubblesLanding } from '../components/MarineBubblesLanding';
 import { MarineDepthHUD } from '../components/MarineDepthHUD';
 import { StoryContactModal } from '../components/StoryContactModal';
+import { Interactive3DCard } from '../components/Interactive3DCard';
+import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { MarineInteractiveHotspot } from '../components/MarineInteractiveHotspot';
 import { dreamAudio } from '../utils/audio';
 
 // Exact HD Scene Images matching the Reference Images provided by the user
@@ -52,7 +54,6 @@ const TIMELINE_NODES: Array<{ id: string; label: string; depth: number; icon?: s
 
 export const AboutMePage: React.FC = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const [isContactOpen, setIsContactOpen] = useState(false);
 
@@ -70,9 +71,12 @@ export const AboutMePage: React.FC = () => {
 
   // ── Audio Lifecycle & Sound Effects ───────────────────────────────────────
   useEffect(() => {
+    // Explicitly guarantee no World Page sky music or space music is playing
+    dreamAudio.stopAllNonUnderwaterMusic();
     dreamAudio.startUnderwaterAmbience();
 
     const resumeAudio = () => {
+      dreamAudio.stopAllNonUnderwaterMusic();
       dreamAudio.startUnderwaterAmbience();
     };
     window.addEventListener('pointerdown', resumeAudio, { once: true });
@@ -85,13 +89,17 @@ export const AboutMePage: React.FC = () => {
       window.removeEventListener('touchstart', resumeAudio);
       window.removeEventListener('wheel', resumeAudio);
       window.removeEventListener('keydown', resumeAudio);
-      dreamAudio.stopUnderwaterAmbience(1.5);
+      dreamAudio.stopUnderwaterAmbience(1.2);
+      dreamAudio.stopScrollingBubbleSound();
     };
   }, []);
 
   useEffect(() => {
     let lastSwimTime = 0;
     const unsubVel = scrollVelocity.on('change', (v: number) => {
+      // Continuous organic water bubble stream for as long as user is scrolling
+      dreamAudio.updateScrollingBubbleSound(v);
+
       const now = Date.now();
       if (Math.abs(v) > 30 && now - lastSwimTime > 340) {
         lastSwimTime = now;
@@ -116,6 +124,7 @@ export const AboutMePage: React.FC = () => {
     return () => {
       unsubVel();
       unsubDepth();
+      dreamAudio.stopScrollingBubbleSound();
     };
   }, [scrollVelocity, smoothedDepth]);
 
@@ -193,6 +202,7 @@ export const AboutMePage: React.FC = () => {
       dreamAudio.startUnderwaterAmbience();
     } else {
       dreamAudio.stopUnderwaterAmbience(0.5);
+      dreamAudio.stopScrollingBubbleSound();
     }
   };
 
@@ -207,16 +217,6 @@ export const AboutMePage: React.FC = () => {
         title="About Me · Alif's Underwater World"
         description="A cinematic, interactive underwater 3D world where visitors explore Alif's story, skills, and passions through a glowing marine fish."
       />
-
-      {/* ── 0. BUBBLES LANDING TRANSITION ─────────────────────────────────── */}
-      <AnimatePresence mode="wait">
-        {isLoading && (
-          <MarineBubblesLanding
-            isActive={isLoading}
-            onComplete={() => setIsLoading(false)}
-          />
-        )}
-      </AnimatePresence>
 
       {/* ── 1. CINEMATIC UNDERWATER REALM BACKDROP ─────────────────────────── */}
       <MarineBackground smoothedDepth={smoothedDepth} maxDepth={MAX_MARINE_DEPTH} />
@@ -247,325 +247,355 @@ export const AboutMePage: React.FC = () => {
           <MarineScene startDepth={SCENE_1_ABOUT} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              {/* Cinematic Scene Card with Ambient Glow */}
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene1Img}
-                  alt="About Me Scene - Exact Reference Artwork"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              {/* Cinematic 3D Scene Card with Ambient Glow and Interactive Tilt */}
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene1Img}
+                    alt="About Me Scene - Exact Reference Artwork"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                {/* Ambient bioluminescent water caustics overlay */}
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  {/* Ambient bioluminescent water caustics overlay */}
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* Interactive Clickable Hotspots on the Wooden Signpost (NO navigation path indicator) */}
-                {/* 1. Developer Signboard */}
-                <button
-                  onClick={() => handleGlideTo(SCENE_2_DEVELOPER)}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute right-[6%] top-[18%] w-[42%] h-[16%] rounded-xl cursor-pointer hover:bg-cyan-400/15 border-2 border-transparent hover:border-cyan-300/40 transition-all focus:outline-none"
-                  title="Glide to Developer"
-                  aria-label="Developer Scene"
-                />
+                  {/* Interactive Clickable Hotspots on the Wooden Signpost with Creative Tooltips & Bubbles */}
+                  {/* 1. Developer Signboard */}
+                  <MarineInteractiveHotspot
+                    onClick={() => handleGlideTo(SCENE_2_DEVELOPER)}
+                    title="Developer Works"
+                    badge="Developer"
+                    tagline="Dive into web apps & systems"
+                    className="absolute right-[6%] top-[18%] w-[42%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
 
-                {/* 2. Skills Signboard */}
-                <button
-                  onClick={() => handleGlideTo(SCENE_4_SKILLS)}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute right-[6%] top-[37%] w-[42%] h-[16%] rounded-xl cursor-pointer hover:bg-cyan-400/15 border-2 border-transparent hover:border-cyan-300/40 transition-all focus:outline-none"
-                  title="Glide to Skills"
-                  aria-label="Skills Scene"
-                />
+                  {/* 2. Skills Signboard */}
+                  <MarineInteractiveHotspot
+                    onClick={() => handleGlideTo(SCENE_4_SKILLS)}
+                    title="Skills Arsenal"
+                    badge="Skills"
+                    tagline="Explore technical mastery"
+                    className="absolute right-[6%] top-[37%] w-[42%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
 
-                {/* 3. Things I Love Signboard */}
-                <button
-                  onClick={() => handleGlideTo(SCENE_5_THINGSILOVE)}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute right-[6%] top-[56%] w-[42%] h-[16%] rounded-xl cursor-pointer hover:bg-cyan-400/15 border-2 border-transparent hover:border-cyan-300/40 transition-all focus:outline-none"
-                  title="Glide to Things I Love"
-                  aria-label="Things I Love Scene"
-                />
-              </div>
+                  {/* 3. Things I Love Signboard */}
+                  <MarineInteractiveHotspot
+                    onClick={() => handleGlideTo(SCENE_5_THINGSILOVE)}
+                    title="Things I Love"
+                    badge="Things I Love"
+                    tagline="Discover passions & hobbies"
+                    className="absolute right-[6%] top-[56%] w-[42%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
+                </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>
 
           {/* ════════════════════════════════════════════════════════════════════
               SCENE 2 — "I'M A CREATIVE WEB DEVELOPER" (Exact Reference Artwork)
-              - Left speech bubble: </> I'm a Creative Web Developer
-              - Floating cyan cards:
-                • Landing Pages
-                • Full Stack Web Apps
-                • Mobile Apps
-                • Discord Bots / Telegram Bots
-                • Currently focusing on Game Development
              ════════════════════════════════════════════════════════════════════ */}
           <MarineScene startDepth={SCENE_2_DEVELOPER} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene2Img}
-                  alt="I'm a Creative Web Developer Scene"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene2Img}
+                    alt="I'm a Creative Web Developer Scene"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* Interactive Clickable Hotspots for Developer Cards with Audio Feedback */}
-                {/* 1. Landing Pages */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[38%] top-[37%] w-[19%] h-[16%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Landing Pages"
-                />
+                  {/* Interactive Hotspots for Developer Cards */}
+                  {/* 1. Landing Pages */}
+                  <MarineInteractiveHotspot
+                    title="Landing Pages"
+                    badge="Landing Pages"
+                    tagline="High-converting & 3D interactive"
+                    className="absolute left-[38%] top-[37%] w-[19%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
 
-                {/* 2. Full Stack Web Apps */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[58%] top-[37%] w-[19%] h-[16%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Full Stack Web Apps"
-                />
+                  {/* 2. Full Stack Web Apps */}
+                  <MarineInteractiveHotspot
+                    title="Full Stack Web Apps"
+                    badge="Full Stack Web Apps"
+                    tagline="React, Node, Express, Databases"
+                    className="absolute left-[58%] top-[37%] w-[19%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
 
-                {/* 3. Mobile Apps */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[78%] top-[33%] w-[17%] h-[16%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Mobile Apps"
-                />
+                  {/* 3. Mobile Apps */}
+                  <MarineInteractiveHotspot
+                    title="Mobile Apps"
+                    badge="Mobile Apps"
+                    tagline="Responsive & cross-platform UX"
+                    className="absolute left-[78%] top-[33%] w-[17%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
 
-                {/* 4. Discord Bots / Telegram Bots */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[68%] top-[51%] w-[27%] h-[16%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Discord Bots / Telegram Bots"
-                />
+                  {/* 4. Discord Bots / Telegram Bots */}
+                  <MarineInteractiveHotspot
+                    title="Discord & Telegram Bots"
+                    badge="Discord & Telegram Bots"
+                    tagline="Custom automations & integrations"
+                    className="absolute left-[68%] top-[51%] w-[27%] h-[16%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
 
-                {/* 5. Currently focusing on Game Development */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[60%] top-[68%] w-[35%] h-[18%] rounded-full cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Currently focusing on Game Development"
-                />
-              </div>
+                  {/* 5. Currently focusing on Game Development */}
+                  <MarineInteractiveHotspot
+                    title="Game Development"
+                    badge="Game Development"
+                    tagline="Three.js, WebGL & Godot Engines"
+                    className="absolute left-[60%] top-[68%] w-[35%] h-[18%]"
+                    shape="pill"
+                    tooltipPlacement="top"
+                  />
+                </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>
 
           {/* ════════════════════════════════════════════════════════════════════
               SCENE 3 — "MY NAME IS ALIF" (Exact Reference Artwork)
-              - Top-left speech bubble: My name is Alif / Full Name: Abdullah Ansari Alif
-              - Lower bubble: Born in Bangladesh with flag 🇧🇩
-              - Classical underwater palace & stone monument with Bangladesh map
              ════════════════════════════════════════════════════════════════════ */}
           <MarineScene startDepth={SCENE_3_IDENTITY} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene3Img}
-                  alt="My name is Alif Scene - Born in Bangladesh"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene3Img}
+                    alt="My name is Alif Scene - Born in Bangladesh"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* Interactive Hotspot: Name Bubble */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[11%] top-[10%] w-[44%] h-[27%] rounded-3xl cursor-pointer hover:bg-cyan-400/15 border-2 border-transparent hover:border-cyan-300/50 transition-all focus:outline-none"
-                  title="Abdullah Ansari Alif"
-                />
+                  {/* Interactive Hotspot: Name Bubble */}
+                  <MarineInteractiveHotspot
+                    title="Abdullah Ansari Alif"
+                    badge="Abdullah Ansari Alif"
+                    tagline="Creative Full-Stack Developer & Designer"
+                    className="absolute left-[11%] top-[10%] w-[44%] h-[27%]"
+                    shape="card"
+                    tooltipPlacement="bottom"
+                  />
 
-                {/* Interactive Hotspot: Bangladesh Badge */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[14%] top-[39%] w-[36%] h-[15%] rounded-full cursor-pointer hover:bg-cyan-400/15 border-2 border-transparent hover:border-cyan-300/50 transition-all focus:outline-none"
-                  title="Born in Bangladesh"
-                />
-              </div>
+                  {/* Interactive Hotspot: Bangladesh Badge */}
+                  <MarineInteractiveHotspot
+                    title="Born in Bangladesh"
+                    badge="Born in Bangladesh"
+                    tagline="Crafting digital worlds with pride"
+                    className="absolute left-[14%] top-[39%] w-[36%] h-[15%]"
+                    shape="pill"
+                    tooltipPlacement="bottom"
+                  />
+                </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>
 
           {/* ════════════════════════════════════════════════════════════════════
               SCENE 4 — "MY OTHER SKILLS" (Exact Reference Artwork)
-              - Top speech bubble: My Other Skills
-              - 5 Glowing Skill Cards:
-                • Velocity Video Editing
-                • Retention Video Editing
-                • Storytelling
-                • Advance AI Prompting
-                • Google & YouTube SEO
              ════════════════════════════════════════════════════════════════════ */}
           <MarineScene startDepth={SCENE_4_SKILLS} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene4Img}
-                  alt="My Other Skills Scene"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene4Img}
+                    alt="My Other Skills Scene"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* 5 Interactive Hotspots for Skills */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[14%] top-[36%] w-[23%] h-[27%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Velocity Video Editing"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[38%] top-[36%] w-[23%] h-[27%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Retention Video Editing"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[62%] top-[36%] w-[23%] h-[27%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Storytelling"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[20%] top-[65%] w-[24%] h-[27%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Advance AI Prompting"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[46%] top-[65%] w-[27%] h-[27%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Google & YouTube SEO"
-                />
-              </div>
+                  {/* 5 Interactive Hotspots for Skills */}
+                  <MarineInteractiveHotspot
+                    title="Velocity Video Editing"
+                    badge="Velocity Editing"
+                    tagline="Dynamic beat-sync & speed curves"
+                    className="absolute left-[14%] top-[36%] w-[23%] h-[27%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Retention Video Editing"
+                    badge="Retention Editing"
+                    tagline="Pacing, hooks & viewer engagement"
+                    className="absolute left-[38%] top-[36%] w-[23%] h-[27%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Storytelling"
+                    badge="Storytelling"
+                    tagline="Narrative resonance & emotional craft"
+                    className="absolute left-[62%] top-[36%] w-[23%] h-[27%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Advance AI Prompting"
+                    badge="AI Prompting"
+                    tagline="Autonomous workflows & fine-tuning"
+                    className="absolute left-[20%] top-[65%] w-[24%] h-[27%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Google & YouTube SEO"
+                    badge="Google & YouTube SEO"
+                    tagline="Algorithmic growth & top discovery"
+                    className="absolute left-[46%] top-[65%] w-[27%] h-[27%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
+                </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>
 
           {/* ════════════════════════════════════════════════════════════════════
               SCENE 5 — "THINGS I LOVE" (Exact Reference Artwork)
-              - Top speech bubble: Things I Love
-              - 5 Passion Cards:
-                • Chess
-                • Speed Rubik's Cube
-                • Gaming
-                • Anime
-                • Football
              ════════════════════════════════════════════════════════════════════ */}
           <MarineScene startDepth={SCENE_5_THINGSILOVE} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene5Img}
-                  alt="Things I Love Scene"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene5Img}
+                    alt="Things I Love Scene"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* 5 Interactive Hotspots for Passions */}
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[19%] top-[33%] w-[19%] h-[24%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Chess"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[41%] top-[33%] w-[22%] h-[24%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Speed Rubik's Cube"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[65%] top-[33%] w-[19%] h-[24%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Gaming"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[30%] top-[58%] w-[19%] h-[24%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Anime"
-                />
-                <button
-                  onClick={() => dreamAudio.playPop()}
-                  onMouseEnter={() => dreamAudio.playHover()}
-                  className="absolute left-[52%] top-[58%] w-[19%] h-[24%] rounded-2xl cursor-pointer hover:bg-cyan-400/20 border-2 border-transparent hover:border-cyan-300/60 transition-all focus:outline-none"
-                  title="Football"
-                />
-              </div>
+                  {/* 5 Interactive Hotspots for Passions */}
+                  <MarineInteractiveHotspot
+                    title="Chess"
+                    badge="Chess"
+                    tagline="Tactical patience & strategic depth"
+                    className="absolute left-[19%] top-[33%] w-[19%] h-[24%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Speed Rubik's Cube"
+                    badge="Speedcubing"
+                    tagline="Sub-15s recognition & muscle memory"
+                    className="absolute left-[41%] top-[33%] w-[22%] h-[24%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Gaming"
+                    badge="Gaming"
+                    tagline="Atmospheric worlds & competitive reflex"
+                    className="absolute left-[65%] top-[33%] w-[19%] h-[24%]"
+                    shape="rounded"
+                    tooltipPlacement="top"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Anime"
+                    badge="Anime"
+                    tagline="Epic storytelling & cinematic direction"
+                    className="absolute left-[30%] top-[58%] w-[19%] h-[24%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
+                  <MarineInteractiveHotspot
+                    title="Football"
+                    badge="Football"
+                    tagline="High-intensity team energy & tactics"
+                    className="absolute left-[52%] top-[58%] w-[19%] h-[24%]"
+                    shape="rounded"
+                    tooltipPlacement="bottom"
+                  />
+                </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>
 
           {/* ════════════════════════════════════════════════════════════════════
               SCENE 6 — "SAME OCEAN... DIFFERENT DREAMS." + ARCH MONUMENT
-              - Cursive script: Same ocean... Different dreams.
-              - Neon cyan Arch Monument: Crown 👑, Alif, Build, Create, Explore
-              - Giant blue whale in sunlit turquoise sea
-              - Interactive Swim Back & Get In Touch actions
              ════════════════════════════════════════════════════════════════════ */}
           <MarineScene startDepth={SCENE_6_ENDING} scrollProgress={smoothedDepth}>
             <div className="relative flex flex-col items-center pointer-events-auto select-none">
               
-              <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
-                <img
-                  src={scene6Img}
-                  alt="Same ocean... Different dreams - Alif Monument"
-                  className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
-                />
+              <Interactive3DCard maxTilt={8} depthZ={16}>
+                <div className="relative rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-cyan-400/50 shadow-[0_0_55px_rgba(56,189,248,0.45)] bg-[#021833]/90">
+                  <img
+                    src={scene6Img}
+                    alt="Same ocean... Different dreams - Alif Monument"
+                    className="w-auto h-auto max-h-[70vh] sm:max-h-[74vh] max-w-[92vw] md:max-w-3xl object-contain block"
+                  />
 
-                <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30 bg-gradient-to-t from-[#021833]/60 via-transparent to-cyan-500/10" />
 
-                {/* Interactive Action Buttons over bottom of Scene 6 */}
-                <div className="absolute bottom-3 sm:bottom-4 left-2 right-2 sm:left-4 sm:right-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-                  <button
-                    onClick={() => handleGlideTo(SCENE_1_ABOUT)}
-                    onMouseEnter={() => dreamAudio.playHover()}
-                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-[#021833]/90 hover:bg-[#03254c] border border-cyan-400/60 text-cyan-200 text-xs font-mono uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.35)] hover:scale-105"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Swim Back</span>
-                  </button>
+                  {/* Interactive Action Buttons over bottom of Scene 6 (Magnetic Shimmer Stroke) */}
+                  <div className="absolute bottom-3 sm:bottom-4 left-2 right-2 sm:left-4 sm:right-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                    <MagneticShimmerButton
+                      variant="glass"
+                      size="sm"
+                      onClick={() => handleGlideTo(SCENE_1_ABOUT)}
+                      onMouseEnter={() => dreamAudio.playHover()}
+                      className="px-3 sm:px-4 py-2 text-xs font-mono uppercase tracking-wider"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Swim Back</span>
+                    </MagneticShimmerButton>
 
-                  <button
-                    onClick={() => {
-                      dreamAudio.playPop();
-                      navigate('/explore-works');
-                    }}
-                    onMouseEnter={() => dreamAudio.playHover()}
-                    className="flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-display font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.6)] hover:brightness-110 transition-all cursor-pointer hover:scale-105"
-                  >
-                    <Compass className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Works</span>
-                  </button>
+                    <MagneticShimmerButton
+                      variant="amber"
+                      size="sm"
+                      onClick={() => {
+                        dreamAudio.playPop();
+                        navigate('/explore-works');
+                      }}
+                      onMouseEnter={() => dreamAudio.playHover()}
+                      className="px-4 sm:px-5 py-2 text-xs font-display font-black uppercase tracking-wider"
+                    >
+                      <Compass className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Works</span>
+                    </MagneticShimmerButton>
 
-                  <button
-                    onClick={() => {
-                      dreamAudio.playPop();
-                      setIsContactOpen(true);
-                    }}
-                    onMouseEnter={() => dreamAudio.playHover()}
-                    className="flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 font-display font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(56,189,248,0.6)] hover:brightness-110 transition-all cursor-pointer hover:scale-105"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Contact</span>
-                  </button>
+                    <MagneticShimmerButton
+                      variant="cyan"
+                      size="sm"
+                      onClick={() => {
+                        dreamAudio.playPop();
+                        setIsContactOpen(true);
+                      }}
+                      onMouseEnter={() => dreamAudio.playHover()}
+                      className="px-4 sm:px-5 py-2 text-xs font-display font-black uppercase tracking-wider text-slate-950"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Contact</span>
+                    </MagneticShimmerButton>
+                  </div>
                 </div>
-              </div>
+              </Interactive3DCard>
 
             </div>
           </MarineScene>

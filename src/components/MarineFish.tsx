@@ -5,481 +5,599 @@ import {
   useTransform,
   useSpring,
 } from 'motion/react';
-import * as THREE from 'three';
+import { dreamAudio } from '../utils/audio';
 
 interface MarineFishProps {
   scrollVelocity: MotionValue<number>;
   smoothedDepth: MotionValue<number>;
 }
 
-interface FishParticle {
-  id: number;
+interface CanvasBubble {
   x: number;
   y: number;
-  size: number;
-  color: string;
-  opacity: number;
+  radius: number;
+  vx: number;
+  vy: number;
+  wobbleSpeed: number;
+  wobbleAmp: number;
+  wobblePhase: number;
+  life: number;
+  decay: number;
 }
 
 export const MarineFish: React.FC<MarineFishProps> = ({
   scrollVelocity,
-  smoothedDepth,
 }) => {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const [particles, setParticles] = useState<FishParticle[]>([]);
-  const lastEmitRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bubblesRef = useRef<CanvasBubble[]>([]);
+  const lastEmitTimeRef = useRef<number>(0);
 
-  // Depth-driven horizontal swim sway (organic S-curve travel across screen)
-  const horizontalSwayRaw = useTransform(smoothedDepth, (d: number) => {
-    const phase = ((d || 0) / 4400) * Math.PI;
-    return Math.sin(phase) * 60;
-  });
-  const swayX = useSpring(horizontalSwayRaw, { stiffness: 65, damping: 22 });
+  const [isHovered, setIsHovered] = useState(false);
+  const [isBursting, setIsBursting] = useState(false);
+  const burstRef = useRef<number>(0);
+  const tailPhaseRef = useRef<number>(0);
 
-  // Bank angle (rolls into turns like a real fish steering with water resistance)
-  const bankRaw = useTransform(smoothedDepth, (d: number) => {
-    const phase = ((d || 0) / 4400) * Math.PI;
-    return Math.sin(phase) * -14;
-  });
-  const bank = useSpring(bankRaw, { stiffness: 85, damping: 22 });
+  // ── SUBTLE POINTER GUIDANCE (Keeps fish solidly centered, max +-16px) ─────
+  const targetPointerX = useRef<number>(0);
 
-  // Pitch reaction: dives forward into ocean depth during swim bursts
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      const normalized = (e.clientX / window.innerWidth) * 2 - 1;
+      targetPointerX.current = Math.max(-16, Math.min(16, normalized * 16));
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        const normalized = (touch.clientX / window.innerWidth) * 2 - 1;
+        targetPointerX.current = Math.max(-16, Math.min(16, normalized * 16));
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
+
+  // Pitch reaction: Upper angle view pitches forward slightly when scrolling forward
   const pitchRaw = useTransform(scrollVelocity, (v: number) => {
     const vel = v || 0;
-    return Math.max(-12, Math.min(12, vel * 0.085));
+    return 24 + Math.max(-4, Math.min(10, vel * 0.04));
   });
-  const pitch = useSpring(pitchRaw, { stiffness: 95, damping: 22 });
+  const pitch = useSpring(pitchRaw, { stiffness: 85, damping: 20 });
 
-  // ── Three.js High-Fidelity 3D Bioluminescent Fish Setup ──────────────────
-  useEffect(() => {
-    const container = mountRef.current;
-    if (!container) return;
+  // ── Realistic Swimming Kinematics State ───────────────────────────────────
+  const [swimState, setSwimState] = useState({
+    posX: 0,
+    bankAngle: 0,
+    headAngle: 0,
+    torsoAngle: 0,
+    tailAngle: 0,
+    finAngle: 0,
+    finTipWave: 0,
+    pectLeftAngle: -22,
+    pectRightAngle: 22,
+    pectScale: 1,
+    corePulse: 0.8,
+  });
 
-    const width = 170;
-    const height = 170;
+  const posXRef = useRef<number>(0);
 
-    const scene = new THREE.Scene();
-
-    // Camera: positioned slightly behind & above, facing forwards into the depth
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
-    camera.position.set(0, 0.95, 3.2);
-    camera.lookAt(0, 0.05, -0.6);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    container.appendChild(renderer.domElement);
-
-    // ── Aquatic Lighting Setup ──────────────────────────────────────────────
-    const ambientLight = new THREE.AmbientLight(0x0284c7, 1.8);
-    scene.add(ambientLight);
-
-    const keyLight = new THREE.DirectionalLight(0xe0f2fe, 2.5);
-    keyLight.position.set(1.5, 4, 3);
-    scene.add(keyLight);
-
-    // Cyan bioluminescent underwater rim light
-    const rimLight = new THREE.PointLight(0x06b6d4, 4.0, 9);
-    rimLight.position.set(0, -1.2, -1.8);
-    scene.add(rimLight);
-
-    // Local pulsing glow light attached above the fish
-    const fishGlowLight = new THREE.PointLight(0x38bdf8, 2.2, 5);
-    fishGlowLight.position.set(0, 0.6, 0);
-    scene.add(fishGlowLight);
-
-    // ── 3D Fish Assembly ────────────────────────────────────────────────────
-    const fishRoot = new THREE.Group();
-    scene.add(fishRoot);
-
-    // ── Premium Organic Shaders & Materials ──
-    const bodyMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x0284c7,
-      emissive: 0x0369a1,
-      emissiveIntensity: 0.45,
-      roughness: 0.15,
-      metalness: 0.12,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.08,
-      reflectivity: 0.9,
-    });
-
-    const finMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x38bdf8,
-      emissive: 0x06b6d4,
-      emissiveIntensity: 0.65,
-      transparent: true,
-      opacity: 0.82,
-      roughness: 0.1,
-      metalness: 0.05,
-      transmission: 0.4,
-      side: THREE.DoubleSide,
-    });
-
-    const finVeilMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x67e8f9,
-      emissive: 0x22d3ee,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0.65,
-      roughness: 0.12,
-      side: THREE.DoubleSide,
-    });
-
-    const eyeWhiteMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.1,
-    });
-
-    const irisMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 0.8,
-      roughness: 0.2,
-    });
-
-    const pupilMaterial = new THREE.MeshStandardMaterial({
-      color: 0x011627,
-      roughness: 0.05,
-    });
-
-    // 1. Head & Torso Assembly (Smooth sculpted body)
-    const torsoGroup = new THREE.Group();
-    fishRoot.add(torsoGroup);
-
-    // Mid-torso
-    const torsoGeom = new THREE.SphereGeometry(0.52, 32, 24);
-    torsoGeom.scale(0.60, 0.76, 1.35);
-    const torsoMesh = new THREE.Mesh(torsoGeom, bodyMaterial);
-    torsoGroup.add(torsoMesh);
-
-    // Smooth tapered snout (head front)
-    const headGeom = new THREE.ConeGeometry(0.31, 0.58, 28);
-    headGeom.rotateX(-Math.PI / 2);
-    const headMesh = new THREE.Mesh(headGeom, bodyMaterial);
-    headMesh.position.set(0, -0.03, -0.92);
-    torsoGroup.add(headMesh);
-
-    // Rounded nose tip
-    const noseTipGeom = new THREE.SphereGeometry(0.09, 16, 16);
-    noseTipGeom.scale(1.2, 0.8, 1);
-    const noseTip = new THREE.Mesh(noseTipGeom, bodyMaterial);
-    noseTip.position.set(0, -0.04, -1.2);
-    torsoGroup.add(noseTip);
-
-    // Bioluminescent Spine Glow Line along the dorsal ridge
-    const spineCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0.12, -1.0),
-      new THREE.Vector3(0, 0.38, -0.4),
-      new THREE.Vector3(0, 0.40, 0.1),
-      new THREE.Vector3(0, 0.28, 0.7),
-    ]);
-    const spineGeom = new THREE.TubeGeometry(spineCurve, 20, 0.018, 8, false);
-    const spineMat = new THREE.MeshBasicMaterial({ color: 0x67e8f9 });
-    const spineMesh = new THREE.Mesh(spineGeom, spineMat);
-    torsoGroup.add(spineMesh);
-
-    // 2. Eyes with glowing cyan iris and catchlights
-    const eyeGeom = new THREE.SphereGeometry(0.088, 16, 16);
-    const irisGeom = new THREE.SphereGeometry(0.065, 16, 16);
-    const pupilGeom = new THREE.SphereGeometry(0.042, 16, 16);
-    const catchlightGeom = new THREE.SphereGeometry(0.018, 8, 8);
-    const catchlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-    // Left eye assembly
-    const leftEyeGroup = new THREE.Group();
-    leftEyeGroup.position.set(-0.27, 0.12, -0.72);
-    const leftEyeWhite = new THREE.Mesh(eyeGeom, eyeWhiteMaterial);
-    const leftIris = new THREE.Mesh(irisGeom, irisMaterial);
-    leftIris.position.set(-0.025, 0, -0.02);
-    const leftPupil = new THREE.Mesh(pupilGeom, pupilMaterial);
-    leftPupil.position.set(-0.045, 0, -0.035);
-    const leftCatchlight = new THREE.Mesh(catchlightGeom, catchlightMat);
-    leftCatchlight.position.set(-0.065, 0.025, -0.04);
-    leftEyeGroup.add(leftEyeWhite, leftIris, leftPupil, leftCatchlight);
-    torsoGroup.add(leftEyeGroup);
-
-    // Right eye assembly
-    const rightEyeGroup = new THREE.Group();
-    rightEyeGroup.position.set(0.27, 0.12, -0.72);
-    const rightEyeWhite = new THREE.Mesh(eyeGeom, eyeWhiteMaterial);
-    const rightIris = new THREE.Mesh(irisGeom, irisMaterial);
-    rightIris.position.set(0.025, 0, -0.02);
-    const rightPupil = new THREE.Mesh(pupilGeom, pupilMaterial);
-    rightPupil.position.set(0.045, 0, -0.035);
-    const rightCatchlight = new THREE.Mesh(catchlightGeom, catchlightMat);
-    rightCatchlight.position.set(0.065, 0.025, -0.04);
-    rightEyeGroup.add(rightEyeWhite, rightIris, rightPupil, rightCatchlight);
-    torsoGroup.add(rightEyeGroup);
-
-    // 3. Arched Dorsal Fin (Graceful crested spine fin)
-    const dorsalPivot = new THREE.Group();
-    dorsalPivot.position.set(0, 0.38, 0.15);
-    torsoGroup.add(dorsalPivot);
-
-    const dorsalShape = new THREE.Shape();
-    dorsalShape.moveTo(0, 0);
-    dorsalShape.quadraticCurveTo(-0.08, 0.44, -0.38, 0.56);
-    dorsalShape.quadraticCurveTo(-0.72, 0.42, -0.92, 0.05);
-    dorsalShape.quadraticCurveTo(-0.45, 0.12, 0, 0);
-    const dorsalGeom = new THREE.ShapeGeometry(dorsalShape);
-    dorsalGeom.rotateY(Math.PI / 2);
-    const dorsalMesh = new THREE.Mesh(dorsalGeom, finMaterial);
-    dorsalPivot.add(dorsalMesh);
-
-    // 4. Pectoral Fins (Fan-shaped gossamer wings that curl & flap)
-    const finShape = new THREE.Shape();
-    finShape.moveTo(0, 0);
-    finShape.quadraticCurveTo(0.25, -0.04, 0.48, -0.22);
-    finShape.quadraticCurveTo(0.42, -0.42, 0.15, -0.38);
-    finShape.quadraticCurveTo(0.05, -0.25, 0, 0);
-    const finGeom = new THREE.ShapeGeometry(finShape);
-
-    // Left pectoral fin
-    const leftFinPivot = new THREE.Group();
-    leftFinPivot.position.set(-0.31, -0.06, -0.32);
-    leftFinPivot.rotation.y = -Math.PI / 3.6;
-    leftFinPivot.rotation.x = 0.22;
-    const leftFinMesh = new THREE.Mesh(finGeom, finMaterial);
-    leftFinMesh.rotation.y = Math.PI;
-    leftFinPivot.add(leftFinMesh);
-    torsoGroup.add(leftFinPivot);
-
-    // Right pectoral fin
-    const rightFinPivot = new THREE.Group();
-    rightFinPivot.position.set(0.31, -0.06, -0.32);
-    rightFinPivot.rotation.y = Math.PI / 3.6;
-    rightFinPivot.rotation.x = 0.22;
-    const rightFinMesh = new THREE.Mesh(finGeom, finMaterial);
-    rightFinPivot.add(rightFinMesh);
-    torsoGroup.add(rightFinPivot);
-
-    // 5. Double-Articulated Tail Peduncle & Flowing Caudal Silk Veil Fin
-    // Joint 1: Tail Base
-    const tailBasePivot = new THREE.Group();
-    tailBasePivot.position.set(0, 0, 0.65);
-    fishRoot.add(tailBasePivot);
-
-    const peduncleGeom = new THREE.ConeGeometry(0.22, 0.62, 22);
-    peduncleGeom.rotateX(Math.PI / 2);
-    const peduncleMesh = new THREE.Mesh(peduncleGeom, bodyMaterial);
-    peduncleMesh.position.set(0, 0, 0.31);
-    tailBasePivot.add(peduncleMesh);
-
-    // Joint 2: Mid-Tail
-    const tailMidPivot = new THREE.Group();
-    tailMidPivot.position.set(0, 0, 0.62);
-    tailBasePivot.add(tailMidPivot);
-
-    // Caudal Fin Main Silk Veil (Upper & Lower crescent lobes)
-    const caudalShape = new THREE.Shape();
-    caudalShape.moveTo(0, 0);
-    caudalShape.quadraticCurveTo(0.18, 0.48, 0.52, 0.72);
-    caudalShape.quadraticCurveTo(0.24, 0.32, 0.08, 0.06);
-    caudalShape.quadraticCurveTo(0.24, -0.32, 0.52, -0.72);
-    caudalShape.quadraticCurveTo(0.18, -0.48, 0, 0);
-    const caudalGeom = new THREE.ShapeGeometry(caudalShape);
-    caudalGeom.rotateY(Math.PI / 2);
-    const caudalMesh = new THREE.Mesh(caudalGeom, finMaterial);
-    tailMidPivot.add(caudalMesh);
-
-    // Joint 3: Trailing gossamer veil extension for wave lag
-    const tailTipPivot = new THREE.Group();
-    tailTipPivot.position.set(0, 0, 0.35);
-    tailMidPivot.add(tailTipPivot);
-
-    const veilShape = new THREE.Shape();
-    veilShape.moveTo(0, 0);
-    veilShape.quadraticCurveTo(0.14, 0.38, 0.42, 0.58);
-    veilShape.quadraticCurveTo(0.22, 0.24, 0.06, 0.04);
-    veilShape.quadraticCurveTo(0.22, -0.24, 0.42, -0.58);
-    veilShape.quadraticCurveTo(0.14, -0.38, 0, 0);
-    const veilGeom = new THREE.ShapeGeometry(veilShape);
-    veilGeom.rotateY(Math.PI / 2);
-    const veilMesh = new THREE.Mesh(veilGeom, finVeilMaterial);
-    tailTipPivot.add(veilMesh);
-
-    // ── Continuous High-Fidelity Physics Animation Loop ─────────────────────
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
-
-    const animateLoop = () => {
-      const elapsed = clock.getElapsedTime();
-      const vel = Math.abs(scrollVelocity.get() || 0);
-
-      // Swimming frequency surges organically with velocity
-      // Cruising idle: ~2.8 Hz -> Rapid propulsion: up to ~8.2 Hz
-      const swimFreq = 2.8 + Math.min(5.4, vel * 0.065);
-      const tailAmp = 0.25 + Math.min(0.38, vel * 0.0045);
-      const tailPhase = elapsed * swimFreq;
-
-      // 1. S-Curve Spine Locomotion with Natural Wave Delay
-      // Head counter-turn
-      torsoGroup.rotation.y = Math.sin(tailPhase + 0.6) * 0.055;
-      // Dorsal fin fluid ripple
-      dorsalPivot.rotation.z = Math.sin(tailPhase) * 0.12;
-
-      // Tail Joint 1: Base stroke
-      tailBasePivot.rotation.y = Math.sin(tailPhase) * tailAmp;
-      // Tail Joint 2: Mid-peduncle wave lag
-      tailMidPivot.rotation.y = Math.sin(tailPhase - 0.7) * (tailAmp * 1.35);
-      // Tail Joint 3: Flowing gossamer veil whip
-      tailTipPivot.rotation.y = Math.sin(tailPhase - 1.4) * (tailAmp * 0.85);
-
-      // 2. Pectoral Fin Water-Resistance Flapping
-      const leftStroke = Math.sin(tailPhase * 0.85);
-      const rightStroke = -leftStroke;
-      leftFinPivot.rotation.z = leftStroke * 0.28;
-      leftFinPivot.rotation.x = 0.22 + Math.cos(tailPhase * 0.85) * 0.16;
-
-      rightFinPivot.rotation.z = rightStroke * 0.28;
-      rightFinPivot.rotation.x = 0.22 - Math.cos(tailPhase * 0.85) * 0.16;
-
-      // 3. Bioluminescent Breathing Pulse
-      const pulse = 0.45 + Math.sin(elapsed * 2.2) * 0.15;
-      bodyMaterial.emissiveIntensity = pulse;
-      finMaterial.emissiveIntensity = pulse + 0.2;
-      fishGlowLight.intensity = 1.8 + Math.sin(elapsed * 2.2) * 0.6;
-
-      renderer.render(scene, camera);
-      animationFrameId = requestAnimationFrame(animateLoop);
-    };
-
-    animateLoop();
-
-    // ── Safe Cleanup on Unmount ─────────────────────────────────────────────
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      renderer.dispose();
-      torsoGeom.dispose();
-      headGeom.dispose();
-      noseTipGeom.dispose();
-      spineGeom.dispose();
-      eyeGeom.dispose();
-      irisGeom.dispose();
-      pupilGeom.dispose();
-      catchlightGeom.dispose();
-      dorsalGeom.dispose();
-      finGeom.dispose();
-      peduncleGeom.dispose();
-      caudalGeom.dispose();
-      veilGeom.dispose();
-      bodyMaterial.dispose();
-      finMaterial.dispose();
-      finVeilMaterial.dispose();
-      eyeWhiteMaterial.dispose();
-      irisMaterial.dispose();
-      pupilMaterial.dispose();
-      catchlightMat.dispose();
-      spineMat.dispose();
-      if (renderer.domElement && renderer.domElement.parentElement) {
-        renderer.domElement.parentElement.removeChild(renderer.domElement);
-      }
-    };
-  }, [scrollVelocity]);
-
-  // Trailing wake bubbles when actively swimming
+  // ── 60FPS COMBINED LOOP: KINEMATICS + CANVAS FLOATING BUBBLES ────────────
   useEffect(() => {
     let animId: number;
-    const emitLoop = () => {
-      const vel = Math.abs(scrollVelocity.get() || 0);
-      const now = performance.now();
-      if (vel > 14 && now - lastEmitRef.current > (110 - Math.min(65, vel * 0.5))) {
-        lastEmitRef.current = now;
-        const newParticle: FishParticle = {
-          id: Math.random(),
-          x: (Math.random() - 0.5) * 14,
-          y: 24 + Math.random() * 8,
-          size: 2.5 + Math.random() * 3.5,
-          color: Math.random() > 0.4 ? '#38bdf8' : '#67e8f9',
-          opacity: 0.85,
-        };
-        setParticles((prev) => [...prev.slice(-12), newParticle]);
-      }
-      animId = requestAnimationFrame(emitLoop);
+    let lastTime = performance.now();
+    let currentSwimX = 0;
+    let currentSwimBank = 0;
+    let currentPointerX = 0;
+    let currentHead = 0;
+    let currentTorso = 0;
+    let currentTail = 0;
+    let currentFin = 0;
+    let currentFinTip = 0;
+    let currentPectL = -22;
+    let currentPectR = 22;
+
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
     };
-    animId = requestAnimationFrame(emitLoop);
-    return () => cancelAnimationFrame(animId);
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    const loop = (currentTime: number) => {
+      const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
+      lastTime = currentTime;
+
+      const vel = scrollVelocity.get() || 0;
+      const isBurstingNow = burstRef.current > 0;
+      if (isBurstingNow) {
+        burstRef.current = Math.max(0, burstRef.current - dt * 1.5);
+      }
+
+      currentPointerX += (targetPointerX.current - currentPointerX) * 0.08;
+      const isMoving = Math.abs(vel) > 6 || isBurstingNow;
+
+      if (isMoving) {
+        const swimFreq = 1.05 + Math.min(0.65, Math.abs(vel) * 0.012) + burstRef.current * 1.2;
+        tailPhaseRef.current += dt * swimFreq * Math.PI * 2;
+        const phase = tailPhaseRef.current;
+
+        const swimAmp = 6.5 + Math.min(3.5, Math.abs(vel) * 0.015) + burstRef.current * 2.5;
+        const targetSwimX = -Math.sin(phase) * swimAmp;
+        const targetSwimBank = -Math.sin(phase) * 4.0;
+
+        currentSwimX += (targetSwimX - currentSwimX) * 0.18;
+        currentSwimBank += (targetSwimBank - currentSwimBank) * 0.18;
+
+        const targetHead = Math.sin(phase) * -2.4;
+        const targetTorso = Math.sin(phase - 0.5) * 4.6;
+        const targetTail = Math.sin(phase - 1.1) * 13.5;
+        const targetFin = Math.sin(phase - 1.8) * 19.5;
+        const targetFinTip = Math.sin(phase * 1.2 - 2.4) * 7.0;
+
+        const pectPhase = phase * 0.9;
+        const targetPectL = -22 + Math.sin(pectPhase) * 11;
+        const targetPectR = 22 - Math.sin(pectPhase) * 11;
+
+        currentHead += (targetHead - currentHead) * 0.15;
+        currentTorso += (targetTorso - currentTorso) * 0.15;
+        currentTail += (targetTail - currentTail) * 0.15;
+        currentFin += (targetFin - currentFin) * 0.15;
+        currentFinTip += (targetFinTip - currentFinTip) * 0.15;
+        currentPectL += (targetPectL - currentPectL) * 0.15;
+        currentPectR += (targetPectR - currentPectR) * 0.15;
+      } else {
+        currentSwimX += (0 - currentSwimX) * 0.10;
+        currentSwimBank += (0 - currentSwimBank) * 0.10;
+        currentHead += (0 - currentHead) * 0.08;
+        currentTorso += (0 - currentTorso) * 0.08;
+        currentTail += (0 - currentTail) * 0.08;
+        currentFin += (0 - currentFin) * 0.08;
+        currentFinTip += (0 - currentFinTip) * 0.08;
+        currentPectL += (-22 - currentPectL) * 0.08;
+        currentPectR += (22 - currentPectR) * 0.08;
+      }
+
+      const totalX = currentSwimX + currentPointerX;
+      const totalBank = currentSwimBank + (currentPointerX * 0.4);
+      posXRef.current = totalX;
+
+      const corePulse = 0.75 + Math.sin(currentTime * 0.0035) * 0.25;
+
+      setSwimState({
+        posX: totalX,
+        bankAngle: totalBank,
+        headAngle: currentHead,
+        torsoAngle: currentTorso,
+        tailAngle: currentTail,
+        finAngle: currentFin,
+        finTipWave: currentFinTip,
+        pectLeftAngle: currentPectL,
+        pectRightAngle: currentPectR,
+        pectScale: isMoving ? 1.05 : 1.0,
+        corePulse,
+      });
+
+      // ── BUBBLE PROPULSION WAKE: RELEASED FROM BACK & SHOOTS TO BOTTOM ──────
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      // Tail position: directly at the rear caudal fin of the fish
+      const tailX = screenW * 0.5 + totalX + (Math.random() - 0.5) * 12;
+      const tailY = screenH * (1 - 0.055) - 22 + (Math.random() - 0.5) * 6;
+
+      if (isMoving) {
+        const absVel = Math.abs(vel);
+        // Reduced density: clean, spaced-out wake bubbles (120ms to 200ms interval)
+        const interval = isBurstingNow ? 60 : Math.max(120, 210 - Math.min(90, absVel * 0.45));
+
+        if (currentTime - lastEmitTimeRef.current > interval) {
+          lastEmitTimeRef.current = currentTime;
+
+          // Single distinct bubble per stroke (lower density, clear & legible)
+          const radius = 4.0 + Math.random() * 7.5; // diameter 8px to 23px
+          // Fast propulsion speed downwards towards the bottom (380px - 750px/sec)
+          const fastVy = 6.2 + Math.random() * 6.0;
+          // Angular dispersion counters the tail fin banking angle
+          const wakeVx = (Math.random() - 0.5) * 2.8 - (currentSwimBank * 0.18);
+
+          bubblesRef.current.push({
+            x: tailX,
+            y: tailY,
+            radius,
+            vx: wakeVx,
+            vy: fastVy, // Shoots backwards and downwards to the bottom!
+            wobbleSpeed: 3.5 + Math.random() * 3.0,
+            wobbleAmp: 0.8 + Math.random() * 1.6,
+            wobblePhase: Math.random() * Math.PI * 2,
+            life: 1.0,
+            decay: 0.022 + Math.random() * 0.012, // Fast life ~0.5s - 0.75s
+          });
+
+          // Trigger synchronized authentic water bubble bloop audio
+          const panRatio = (tailX / screenW) * 2 - 1;
+          dreamAudio.playSynchronizedBubble(radius * 2, panRatio);
+        }
+      }
+
+      // ── RENDER BUBBLES ON CANVAS (60FPS Silky Smooth) ─────────────────────
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, screenW, screenH);
+
+          const timeSec = currentTime * 0.001;
+          const activeBubbles: CanvasBubble[] = [];
+
+          for (let i = 0; i < bubblesRef.current.length; i++) {
+            const b = bubblesRef.current[i];
+            b.x += b.vx + Math.sin(timeSec * b.wobbleSpeed + b.wobblePhase) * b.wobbleAmp * 0.25;
+            b.y += b.vy; // Travels fast towards the bottom
+            b.radius += 0.025; // Expands slightly as it disperses
+            b.life -= b.decay;
+
+            // Active while alive and not yet off the bottom of the screen
+            if (b.life > 0 && b.y < screenH + 60) {
+              activeBubbles.push(b);
+
+              const alpha = Math.min(0.85, Math.sin(b.life * Math.PI) * 1.1);
+
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+
+              // 1. Realistic Semi-Transparent Liquid Bubble Shading
+              const grad = ctx.createRadialGradient(
+                b.x - b.radius * 0.35,
+                b.y - b.radius * 0.35,
+                b.radius * 0.1,
+                b.x,
+                b.y,
+                b.radius
+              );
+              grad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * alpha})`);
+              grad.addColorStop(0.25, `rgba(255, 255, 255, ${0.45 * alpha})`);
+              grad.addColorStop(0.6, `rgba(56, 189, 248, ${0.28 * alpha})`);
+              grad.addColorStop(0.85, `rgba(6, 182, 212, ${0.15 * alpha})`);
+              grad.addColorStop(1, `rgba(255, 255, 255, ${0.75 * alpha})`);
+
+              ctx.fillStyle = grad;
+              ctx.shadowColor = `rgba(56, 189, 248, ${0.5 * alpha})`;
+              ctx.shadowBlur = 8;
+              ctx.fill();
+
+              // 2. Delicate Refractive Outer Rim
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = `rgba(255, 255, 255, ${0.75 * alpha})`;
+              ctx.stroke();
+
+              // 3. Crisp Specular Crescent Highlight (Sunlight caustic reflection)
+              ctx.beginPath();
+              ctx.arc(
+                b.x - b.radius * 0.35,
+                b.y - b.radius * 0.35,
+                b.radius * 0.28,
+                0,
+                Math.PI * 2
+              );
+              ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * alpha})`;
+              ctx.shadowBlur = 0;
+              ctx.fill();
+
+              ctx.restore();
+            }
+          }
+
+          bubblesRef.current = activeBubbles;
+        }
+      }
+
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [scrollVelocity]);
 
-  // Clean expired wake bubbles
-  useEffect(() => {
-    if (particles.length === 0) return;
-    const t = setTimeout(() => {
-      setParticles((prev) => prev.slice(1));
-    }, 750);
-    return () => clearTimeout(t);
-  }, [particles]);
+  // Interactive Click: Playful dash flurry
+  const handleFishClick = () => {
+    if (isBursting) return;
+    setIsBursting(true);
+    burstRef.current = 1.0;
+    dreamAudio.playFishTailSwish();
+
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    const tailX = screenW * 0.5 + posXRef.current;
+    const tailY = screenH * (1 - 0.055) - 34;
+
+    // Burst of 6 fast bubbles shooting backwards and downwards to bottom
+    for (let i = 0; i < 6; i++) {
+      const radius = 4.5 + Math.random() * 6.5;
+      bubblesRef.current.push({
+        x: tailX + (Math.random() - 0.5) * 20,
+        y: tailY + (Math.random() - 0.5) * 8,
+        radius,
+        vx: (Math.random() - 0.5) * 3.5,
+        vy: 7.0 + Math.random() * 6.0, // Shoots fast to the bottom
+        wobbleSpeed: 3.5 + Math.random() * 3,
+        wobbleAmp: 1.0 + Math.random() * 1.5,
+        wobblePhase: Math.random() * Math.PI * 2,
+        life: 1.0,
+        decay: 0.024 + Math.random() * 0.012,
+      });
+
+      setTimeout(() => {
+        dreamAudio.playSynchronizedBubble(radius * 2, (tailX / screenW) * 2 - 1);
+      }, i * 45);
+    }
+
+    setTimeout(() => {
+      setIsBursting(false);
+    }, 650);
+  };
 
   return (
-    <div
-      className="fixed pointer-events-none select-none z-50"
-      style={{
-        left: '50%',
-        bottom: '8.0%',
-        transform: 'translateX(-50%)',
-      }}
-    >
-      <motion.div
+    <>
+      {/* ── 1. FLOATING SEMI-TRANSPARENT BUBBLE PARTICLES CANVAS (Behind Fish Path) ── */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 pointer-events-none z-40 w-full h-full overflow-hidden"
+      />
+
+      {/* ── 2. FORWARD-FACING 2D CYBER-FISH (Upper-Angle View, z-50) ── */}
+      <div
+        className="fixed select-none z-50 pointer-events-auto cursor-pointer"
         style={{
-          x: swayX,
-          rotateZ: bank,
-          rotateX: pitch,
-          transformStyle: 'preserve-3d',
+          left: '50%',
+          bottom: '5.5%',
+          transform: 'translateX(-50%)',
+          perspective: '900px',
         }}
-        animate={{
-          y: [-4, 4, -4],
-        }}
-        transition={{
-          duration: 3.2,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-        className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center will-change-transform"
+        onClick={handleFishClick}
+        onPointerEnter={() => setIsHovered(true)}
+        onPointerLeave={() => setIsHovered(false)}
+        title="Cyber-Marine Companion · Scroll to emit floating bubbles"
       >
-        {/* Bioluminescent Aqua Glow Halo around 3D Fish */}
-        <div className="absolute w-16 h-16 rounded-full bg-cyan-400/25 blur-lg pointer-events-none animate-pulse" />
-        <div className="absolute w-12 h-12 rounded-full bg-blue-500/20 blur-md pointer-events-none" />
-
-        {/* Trailing Bioluminescent Wake Particles & Bubbles */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          {particles.map((p) => (
-            <motion.div
-              key={p.id}
-              initial={{ scale: 0.3, opacity: p.opacity, y: p.y, x: p.x }}
-              animate={{
-                scale: 1.4,
-                opacity: 0,
-                y: p.y + 36 + Math.random() * 20,
-                x: p.x + (Math.random() - 0.5) * 16,
-              }}
-              transition={{ duration: 0.75, ease: 'easeOut' }}
-              style={{
-                position: 'absolute',
-                width: p.size,
-                height: p.size,
-                backgroundColor: p.color,
-                boxShadow: `0 0 8px ${p.color}`,
-              }}
-              className="rounded-full backdrop-blur-xs border border-white/60"
-            />
-          ))}
-        </div>
-
-        {/* ── 3D THREE.JS CANVAS CONTAINER (Facing Forwards into Ocean) ── */}
-        <div
-          ref={mountRef}
-          className="relative w-full h-full flex items-center justify-center pointer-events-none drop-shadow-[0_8px_20px_rgba(2,132,199,0.7)]"
-        />
-
-        {/* Ambient Water Shimmer beneath Fish */}
         <motion.div
-          animate={{ scale: [1, 1.25, 1], opacity: [0.2, 0.45, 0.2] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -bottom-1 w-20 h-4 rounded-full border border-cyan-400/30 blur-xs pointer-events-none"
-        />
-      </motion.div>
-    </div>
+          style={{
+            x: swimState.posX,
+            rotateZ: swimState.bankAngle,
+            rotateX: pitch,
+            transformStyle: 'preserve-3d',
+          }}
+          animate={{
+            y: isHovered ? [-4, 4, -4] : [-2.5, 2.5, -2.5],
+            scale: isHovered ? 1.05 : 1.0,
+          }}
+          transition={{
+            y: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' },
+            scale: { duration: 0.25 },
+          }}
+          className="relative w-32 h-44 sm:w-36 sm:h-48 flex items-center justify-center will-change-transform group"
+        >
+          {/* Modern Cybernetic Bioluminescent Ambient Glow */}
+          <div
+            style={{ opacity: swimState.corePulse }}
+            className="absolute w-26 h-34 rounded-full bg-cyan-400/20 blur-2xl pointer-events-none transition-opacity duration-300 group-hover:bg-cyan-400/35"
+          />
+          <div className="absolute w-16 h-20 rounded-full bg-sky-500/20 blur-lg pointer-events-none" />
+
+          {/* User Control HUD Target Reticle (Centered subtle cyber guide ring) */}
+          <div className="absolute -bottom-3 w-26 h-6 rounded-full border border-cyan-400/25 blur-xs pointer-events-none scale-y-60 group-hover:border-cyan-400/50 transition-colors" />
+
+          {/* Dynamic Shadow beneath the Fish (Upper perspective depth) */}
+          <div className="absolute -bottom-2 w-22 h-5 rounded-full bg-[#020e1f]/75 blur-sm pointer-events-none scale-y-75" />
+
+          {/* ── MODERN FUTURISTIC CYBER-FISH (Facing Forward / Seen from Upper Angle) ── */}
+          <svg
+            viewBox="-75 -75 150 205"
+            className="w-full h-full overflow-visible drop-shadow-[0_14px_28px_rgba(2,132,199,0.75)]"
+          >
+            <defs>
+              <linearGradient id="cyberHullGradUpper3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#040e1b" />
+                <stop offset="25%" stopColor="#081e38" />
+                <stop offset="50%" stopColor="#0f345c" />
+                <stop offset="75%" stopColor="#081e38" />
+                <stop offset="100%" stopColor="#040e1b" />
+              </linearGradient>
+
+              <linearGradient id="cyberTopPlateGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#1e4e79" />
+                <stop offset="50%" stopColor="#0f345c" />
+                <stop offset="100%" stopColor="#06182d" />
+              </linearGradient>
+
+              <linearGradient id="neonLaserGradUpper3" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+                <stop offset="30%" stopColor="#00f0ff" stopOpacity="0.95" />
+                <stop offset="85%" stopColor="#0284c7" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#00f0ff" stopOpacity="0.8" />
+              </linearGradient>
+
+              <linearGradient id="cyberHoloFinGradUpper3" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.95" />
+                <stop offset="50%" stopColor="#0284c7" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.35" />
+              </linearGradient>
+
+              <radialGradient id="cyberCoreGradUpper3" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="40%" stopColor="#00f0ff" />
+                <stop offset="75%" stopColor="#0284c7" />
+                <stop offset="100%" stopColor="#031933" />
+              </radialGradient>
+
+              <linearGradient id="headlightBeam3" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.65" />
+                <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
+            {/* ── FORWARD ILLUMINATION BEAMS (Projected into the deep water ahead) ── */}
+            <g transform={`rotate(${swimState.headAngle}, 0, 0)`} className="pointer-events-none">
+              <polygon points="-8,-48 -24,-72 -14,-72 -5,-48" fill="url(#headlightBeam3)" />
+              <polygon points="8,-48 24,-72 14,-72 5,-48" fill="url(#headlightBeam3)" />
+            </g>
+
+            {/* ── 1. MODERN GEOMETRIC PECTORAL HYDRO-WINGS ── */}
+            <g
+              transform={`translate(-18, 5) rotate(${swimState.pectLeftAngle}) scale(${swimState.pectScale}, 1)`}
+              className="transition-transform duration-100"
+            >
+              <path
+                d="M 0 0 L -30 10 L -36 28 L -24 38 L -6 20 Z"
+                fill="url(#cyberHoloFinGradUpper3)"
+                stroke="#00f0ff"
+                strokeWidth="1.2"
+                className="drop-shadow-[0_0_10px_rgba(0,240,255,0.7)]"
+              />
+              <path d="M 0 4 L -26 14 L -30 26" stroke="#ffffff" strokeWidth="0.8" fill="none" strokeOpacity="0.8" />
+              <path d="M 0 9 L -18 18 L -22 28" stroke="#38bdf8" strokeWidth="0.7" fill="none" strokeOpacity="0.7" />
+            </g>
+
+            <g
+              transform={`translate(18, 5) rotate(${swimState.pectRightAngle}) scale(${swimState.pectScale}, 1)`}
+              className="transition-transform duration-100"
+            >
+              <path
+                d="M 0 0 L 30 10 L 36 28 L 24 38 L 6 20 Z"
+                fill="url(#cyberHoloFinGradUpper3)"
+                stroke="#00f0ff"
+                strokeWidth="1.2"
+                className="drop-shadow-[0_0_10px_rgba(0,240,255,0.7)]"
+              />
+              <path d="M 0 4 L 26 14 L 30 26" stroke="#ffffff" strokeWidth="0.8" fill="none" strokeOpacity="0.8" />
+              <path d="M 0 9 L 18 18 L 22 28" stroke="#38bdf8" strokeWidth="0.7" fill="none" strokeOpacity="0.7" />
+            </g>
+
+            {/* ── 2. UPPER-PERSPECTIVE AERO HULL & FORWARD-FACING SNOUT ── */}
+            <g transform={`rotate(${swimState.headAngle}, 0, 0)`}>
+              <path
+                d="M 0 -52 
+                   L 14 -44 L 23 -22 L 24 6 L 16 32 L 8 48
+                   L -8 48 L -16 32 L -24 6 L -23 -22 L -14 -44 Z"
+                fill="url(#cyberHullGradUpper3)"
+                stroke="#00f0ff"
+                strokeWidth="1.2"
+                strokeLinejoin="round"
+              />
+
+              <path
+                d="M 0 -48 
+                   L 10 -40 L 15 -18 L 12 12 L 0 20
+                   L -12 12 L -15 -18 L -10 -40 Z"
+                fill="url(#cyberTopPlateGrad3)"
+                stroke="#00ffff"
+                strokeWidth="0.8"
+                strokeOpacity="0.6"
+              />
+
+              <path
+                d="M 0 -48 L 0 46"
+                stroke="url(#neonLaserGradUpper3)"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                className="drop-shadow-[0_0_8px_rgba(0,240,255,0.9)]"
+              />
+
+              <g transform="translate(0, 0)">
+                <polygon
+                  points="0,-8 7,-4 7,4 0,8 -7,4 -7,-4"
+                  fill="url(#cyberCoreGradUpper3)"
+                  stroke="#00ffff"
+                  strokeWidth="1.2"
+                  className="drop-shadow-[0_0_12px_rgba(0,240,255,1)]"
+                />
+                <circle cx="0" cy="0" r="2.8" fill="#ffffff" />
+              </g>
+
+              <circle cx="-7" cy="-46" r="2.5" fill="#ffffff" stroke="#00f0ff" strokeWidth="0.8" className="drop-shadow-[0_0_6px_#00f0ff]" />
+              <circle cx="7" cy="-46" r="2.5" fill="#ffffff" stroke="#00f0ff" strokeWidth="0.8" className="drop-shadow-[0_0_6px_#00f0ff]" />
+
+              <g transform="translate(-17, -26)">
+                <rect x="-3.5" y="-3" width="7" height="6" rx="2" fill="#020e1f" stroke="#00f0ff" strokeWidth="0.8" />
+                <circle cx="0" cy="0" r="2.0" fill="#00ffff" />
+              </g>
+              <g transform="translate(17, -26)">
+                <rect x="-3.5" y="-3" width="7" height="6" rx="2" fill="#020e1f" stroke="#00f0ff" strokeWidth="0.8" />
+                <circle cx="0" cy="0" r="2.0" fill="#00ffff" />
+              </g>
+
+              {/* ── 3. ARTICULATED CYBER-TAIL PEDUNCLE (Moves ONLY when user scrolls) ── */}
+              <g transform={`translate(0, 46) rotate(${swimState.tailAngle})`}>
+                <polygon
+                  points="-8,0 -5,28 0,34 5,28 8,0"
+                  fill="url(#cyberHullGradUpper3)"
+                  stroke="#0284c7"
+                  strokeWidth="1.0"
+                />
+                <path
+                  d="M 0 0 L 0 32"
+                  stroke="url(#neonLaserGradUpper3)"
+                  strokeWidth="2.0"
+                  strokeLinecap="round"
+                  className="drop-shadow-[0_0_6px_rgba(0,240,255,0.85)]"
+                />
+
+                {/* ── 4. MODERN FUTURISTIC HOLOGRAPHIC CAUDAL FIN ── */}
+                <g transform={`translate(0, 32) rotate(${swimState.finAngle})`}>
+                  <path
+                    d="M 0 0 
+                       L -22 14 L -40 32 L -42 48 L -24 52 L -8 40 L 0 28
+                       L 8 40 L 24 52 L 42 48 L 40 32 L 22 14 Z"
+                    fill="url(#cyberHoloFinGradUpper3)"
+                    stroke="#00f0ff"
+                    strokeWidth="1.4"
+                    className="drop-shadow-[0_0_14px_rgba(0,240,255,0.85)]"
+                  />
+
+                  <path d="M 0 4 L -24 28 L -34 44" stroke="#ffffff" strokeWidth="1.0" strokeOpacity="0.85" fill="none" />
+                  <path d="M 0 4 L -12 30 L -18 48" stroke="#38bdf8" strokeWidth="0.8" strokeOpacity="0.75" fill="none" />
+                  <path d="M 0 4 L 0 26" stroke="#ffffff" strokeWidth="1.2" strokeOpacity="0.9" fill="none" />
+                  <path d="M 0 4 L 12 30 L 18 48" stroke="#38bdf8" strokeWidth="0.8" strokeOpacity="0.75" fill="none" />
+                  <path d="M 0 4 L 24 28 L 34 44" stroke="#ffffff" strokeWidth="1.0" strokeOpacity="0.85" fill="none" />
+
+                  <g transform={`rotate(${swimState.finTipWave}, 0, 38)`}>
+                    <path
+                      d="M -32 46 L -16 48 L 0 34 L 16 48 L 32 46"
+                      stroke="#ffffff"
+                      strokeWidth="1.0"
+                      strokeOpacity="0.9"
+                      fill="none"
+                    />
+                  </g>
+                </g>
+              </g>
+
+            </g>
+          </svg>
+
+          {/* High-Tech Energy Wave Ring beneath the Fish */}
+          <motion.div
+            animate={{ scale: [1, 1.25, 1], opacity: [0.3, 0.65, 0.3] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -bottom-1 w-24 h-4 rounded-full border border-cyan-400/50 blur-xs pointer-events-none"
+          />
+        </motion.div>
+      </div>
+    </>
   );
 };

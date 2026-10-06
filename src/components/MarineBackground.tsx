@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion, MotionValue, useTransform } from 'motion/react';
+import { CursorBackgroundBlurLens } from './CursorBackgroundBlurLens';
 import underwaterBgImg from '../assets/images/underwater_realm_bg_1790932850703.jpg';
 
 interface MarineBackgroundProps {
@@ -56,6 +57,9 @@ export const MarineBackground: React.FC<MarineBackgroundProps> = ({
         {/* Deep Ocean Ambient Light & Vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#04244a]/40 via-transparent to-[#020914]/80 mix-blend-multiply" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_#010712_100%)] opacity-75" />
+
+        {/* Localized Cursor Blur Lens (Blurs only background image within distance) */}
+        <CursorBackgroundBlurLens />
       </motion.div>
 
       {/* ── 2. SUNLIT ILLUMINATION IN SCENE 7 (ENDING OCEAN CANYON) ── */}

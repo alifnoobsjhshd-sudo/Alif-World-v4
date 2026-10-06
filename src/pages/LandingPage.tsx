@@ -6,6 +6,9 @@ import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { CartoonCloudTransition } from '../components/CartoonCloudTransition';
 import { StoryContactModal } from '../components/StoryContactModal';
+import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { LetsDriveButton } from '../components/LetsDriveButton';
+import { CursorBackgroundBlurLens } from '../components/CursorBackgroundBlurLens';
 import landingBgUser from '../assets/images/landing_bg_user.jpg';
 import landingBgMobile from '../assets/images/landing_bg_mobile.jpg';
 
@@ -43,19 +46,23 @@ export const LandingPage: React.FC = () => {
   const mouseY = useMotionValue(0);
 
   // Highly responsive, critically-damped spring: tracks mouse smoothly with zero click requirement
-  const springX = useSpring(mouseX, { stiffness: 75, damping: 19, mass: 0.45 });
-  const springY = useSpring(mouseY, { stiffness: 75, damping: 19, mass: 0.45 });
+  const springX = useSpring(mouseX, { stiffness: 65, damping: 22, mass: 0.5 });
+  const springY = useSpring(mouseY, { stiffness: 65, damping: 22, mass: 0.5 });
 
-  // 3D Perspective Tilt and Parallax Shifts:
-  // Rotations create realistic diorama tilt
-  const bgX = useTransform(springX, [-1, 1], [22, -22]);
-  const bgY = useTransform(springY, [-1, 1], [16, -16]);
-  const bgRotY = useTransform(springX, [-1, 1], [-3.8, 3.8]);
-  const bgRotX = useTransform(springY, [-1, 1], [3.2, -3.2]);
+  // 3D Perspective Tilt and Multi-Plane Parallax Shifts (Active for Desktop):
+  const bgX = useTransform(springX, [-1, 1], [32, -32]);
+  const bgY = useTransform(springY, [-1, 1], [22, -22]);
+  const bgRotY = useTransform(springX, [-1, 1], [-5.2, 5.2]);
+  const bgRotX = useTransform(springY, [-1, 1], [4.4, -4.4]);
 
-  // Subtle foreground cloud float
-  const cloudParallaxX = useTransform(springX, [-1, 1], [-10, 10]);
-  const cloudParallaxY = useTransform(springY, [-1, 1], [-7, 7]);
+  // Foreground Dream Cloud & Plane 3D Counter-Parallax (Pop out towards viewer)
+  const cloudParallaxX = useTransform(springX, [-1, 1], [-30, 30]);
+  const cloudParallaxY = useTransform(springY, [-1, 1], [-20, 20]);
+  const cloudRotZ = useTransform(springX, [-1, 1], [-2.5, 2.5]);
+
+  // Atmospheric Cursor Spotlight: Dynamic ambient light follow
+  const cursorLightX = useTransform(springX, [-1, 1], [30, 70]);
+  const cursorLightY = useTransform(springY, [-1, 1], [25, 75]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -251,6 +258,9 @@ export const LandingPage: React.FC = () => {
                 ease: 'easeInOut',
               }}
             />
+
+            {/* Localized Cursor Blur Lens (Blurs only background image within distance) */}
+            <CursorBackgroundBlurLens />
 
             {/* ── MIDGROUND LAYER: WARM LAMP GLOW, DUST MOTES ── */}
             <div 
@@ -576,56 +586,51 @@ export const LandingPage: React.FC = () => {
         }} 
       />
 
-      {/* ── TOP LEFT CONTACT MENU BUTTON (Glassy Liquid Card) ──────────────── */}
+      {/* ── TOP LEFT CONTACT MENU BUTTON (Magnetic Shimmer Stroke) ─────────── */}
       <motion.div
         className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] sm:top-5 sm:left-5 md:top-6 md:left-6 z-40"
         animate={isZooming ? { opacity: 0, pointerEvents: 'none' } : { opacity: 1 }}
         transition={{ duration: 0.2 }}
       >
-        <motion.button
+        <MagneticShimmerButton
+          variant="glass"
+          size="sm"
           onClick={() => {
             dreamAudio.playPop();
             setIsContactOpen(true);
           }}
           onMouseEnter={() => dreamAudio.playHover()}
-          whileHover={{ scale: 1.05, y: -1 }}
-          whileTap={{ scale: 0.95 }}
-          className="relative overflow-hidden flex items-center gap-2.5 px-4 py-2 sm:py-2.5 rounded-full bg-white/80 hover:bg-white/95 backdrop-blur-2xl border border-white/60 shadow-[0_8px_24px_rgba(0,0,0,0.09),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-800 transition-all pointer-events-auto cursor-pointer group active:scale-95"
           title="Contact Menu (Discord, Email, WhatsApp)"
           aria-label="Open Contact Menu"
+          className="px-4 py-2 sm:py-2.5"
         >
-          {/* Specular gloss sheen */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/45 via-transparent to-transparent pointer-events-none" />
           <Mail className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform drop-shadow-sm" />
           <span className="font-display font-bold text-xs sm:text-sm tracking-wide text-slate-800 drop-shadow-sm">
             Contact
           </span>
-        </motion.button>
+        </MagneticShimmerButton>
       </motion.div>
 
-      {/* ── TOP RIGHT AUDIO MUTE BUTTON (Glassy Liquid Orb) ───────────────── */}
+      {/* ── TOP RIGHT AUDIO MUTE BUTTON (Magnetic Shimmer Stroke) ──────────── */}
       <motion.div
         className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] sm:top-5 sm:right-5 md:top-6 md:right-6 z-40"
         animate={isZooming ? { opacity: 0, pointerEvents: 'none' } : { opacity: 1 }}
         transition={{ duration: 0.2 }}
       >
-        <motion.button
+        <MagneticShimmerButton
+          variant="glass"
+          size="icon"
           onClick={toggleAudio}
           onMouseEnter={() => dreamAudio.playHover()}
-          whileHover={{ scale: 1.08, y: -1 }}
-          whileTap={{ scale: 0.92 }}
-          className="relative overflow-hidden w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/80 hover:bg-white/95 backdrop-blur-2xl border border-white/60 shadow-[0_8px_24px_rgba(0,0,0,0.09),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-700 hover:text-slate-900 transition-all pointer-events-auto flex items-center justify-center cursor-pointer active:scale-95 group"
           title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
           aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
         >
-          {/* Specular gloss sheen */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/45 via-transparent to-transparent pointer-events-none" />
           {isMuted ? (
             <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           ) : (
             <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 animate-pulse" />
           )}
-        </motion.button>
+        </MagneticShimmerButton>
       </motion.div>
 
       {/* ── CONTACT MODAL (Opens with Discord alifop24_, Email, WhatsApp) ── */}
@@ -637,38 +642,25 @@ export const LandingPage: React.FC = () => {
         }}
       />
 
-      {/* ── ACTION BUTTON: Anchored to Right side on Desktop; Bottom center on Mobile ── */}
+      {/* ── ACTION BUTTON: Anchored to Right side in Middle Vertically on Desktop, Bottom Center on Mobile ──────── */}
       <motion.div
-        className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] sm:bottom-8 left-0 right-0 flex justify-center z-30 px-4
-                   lg:bottom-12 xl:bottom-16 lg:right-12 xl:right-16 lg:left-auto lg:top-auto lg:w-auto lg:px-0 lg:justify-end bg-transparent pointer-events-auto"
-        initial={{ opacity: 0, y: 30 }}
+        className="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 lg:bottom-auto lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:translate-x-0 lg:right-10 xl:right-14 z-30 flex justify-center lg:justify-end items-center bg-transparent pointer-events-auto"
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={
           isZooming
-            ? { opacity: 0, y: 35, scale: 0.95, pointerEvents: 'none', transition: { duration: 0.2 } }
-            : { opacity: 1, y: 0, scale: 1, pointerEvents: 'auto', transition: { duration: 0.5, delay: 0.1 } }
+            ? { opacity: 0, scale: 0.9, pointerEvents: 'none', transition: { duration: 0.2 } }
+            : { opacity: 1, scale: 1, pointerEvents: 'auto', transition: { duration: 0.5, delay: 0.1 } }
         }
       >
-        {/* BUTTON: "LET'S DRIVE" */}
-        <motion.button
+        {/* BUTTON: "LET'S DRIVE" WITH CURSOR-FOLLOW GRADIENT OUTLINE & 3D TILT */}
+        <LetsDriveButton
           onClick={handleStartStory}
           onMouseEnter={() => {
             setIsHoveringStory(true);
             dreamAudio.playHover();
           }}
           onMouseLeave={() => setIsHoveringStory(false)}
-          whileHover={{ scale: 1.05, y: -2 }}
-          whileTap={{ scale: 0.95, y: 1 }}
-          className="relative group w-72 sm:w-80 md:w-84 lg:w-80 xl:w-88 py-4 px-6 sm:px-7 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-emerald-500/95 via-teal-600/95 to-sky-600/95 hover:from-emerald-400 hover:to-sky-500 text-white font-display font-black text-sm sm:text-base lg:text-lg tracking-wider uppercase shadow-[0_14px_36px_rgba(16,185,129,0.45),inset_0_1.5px_1px_rgba(255,255,255,0.7),0_4px_0_#0f766e] active:shadow-[0_2px_10px_rgba(16,185,129,0.35),0_1px_0_#0f766e] transition-all flex items-center justify-center gap-3 border border-white/50 overflow-hidden cursor-pointer backdrop-blur-2xl"
-        >
-          {/* Top subtle highlight glint for glassy depth */}
-          <div className="absolute top-0 left-0 right-0 h-[48%] bg-gradient-to-b from-white/35 to-transparent rounded-t-2xl sm:rounded-t-3xl pointer-events-none" />
-          {/* Shimmer sweep */}
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
-
-          <Compass className="w-5 h-5 text-emerald-100 group-hover:rotate-45 transition-transform duration-500 shrink-0 drop-shadow" />
-          <span className="drop-shadow-md whitespace-nowrap">LET'S DRIVE</span>
-          <Sparkles className="w-4 h-4 text-amber-200 shrink-0 animate-pulse drop-shadow" />
-        </motion.button>
+        />
       </motion.div>
     </div>
   );

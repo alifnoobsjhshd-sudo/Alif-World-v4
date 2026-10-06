@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { motion } from 'motion/react';
 
-interface TrailParticle {
+interface CursorBubble {
   id: number;
   x: number;
   y: number;
-  opacity: number;
-  scale: number;
+  size: number;
+  wobble: number;
 }
 
 export const CustomCursor: React.FC = () => {
@@ -20,29 +21,33 @@ export const CustomCursor: React.FC = () => {
   const mousePos = useRef({ x: -100, y: -100 });
   // Trailing delayed coordinates (interpolated)
   const trailPos = useRef({ x: -100, y: -100 });
-  // Velocity for dynamic cursor squish / stretch
+  // Velocity for dynamic cursor angle / motion
   const vel = useRef({ x: 0, y: 0 });
 
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
-  const [particles, setParticles] = useState<TrailParticle[]>([]);
-  const particleIdCounter = useRef(0);
 
-  // Determine current page theme for unique styling
+  // About Me Page cursor bubbles state
+  const [bubbles, setBubbles] = useState<CursorBubble[]>([]);
+  const bubbleIdCounter = useRef(0);
+  const lastBubbleTime = useRef(0);
+
+  // Determine current page theme
   const path = location.pathname.toLowerCase();
   const isLanding = path === '/' || path === '';
+  const isAboutMe = path.startsWith('/about');
   const isWorld = path.startsWith('/world');
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
   const isCosmic = path.startsWith('/explore-work');
   const isProjects = path.startsWith('/project');
 
   useEffect(() => {
-    // Check if the primary device uses a precise pointing device (mouse or trackpad)
-    const mediaQuery = window.matchMedia('(pointer: fine)');
-    setHasMouse(mediaQuery.matches);
+    // Keep custom cursor enabled for desktop and virtual cursor testing on all devices
+    setHasMouse(true);
 
-    const handleMediaChange = (e: MediaQueryListEvent) => {
-      setHasMouse(e.matches);
+    const mediaQuery = window.matchMedia('(pointer: fine)');
+    const handleMediaChange = () => {
+      setHasMouse(true);
     };
     mediaQuery.addEventListener('change', handleMediaChange);
 
@@ -52,18 +57,18 @@ export const CustomCursor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!hasMouse) return;
-
     let animId: number;
-    let lastSpawnTime = 0;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      mousePos.current.x = e.clientX;
-      mousePos.current.y = e.clientY;
-      if (!isVisible) setIsVisible(true);
+    // Initialize to center if not set
+    if (mousePos.current.x < 0 && typeof window !== 'undefined') {
+      mousePos.current.x = window.innerWidth / 2;
+      mousePos.current.y = window.innerHeight / 2;
+      trailPos.current.x = window.innerWidth / 2;
+      trailPos.current.y = window.innerHeight / 2;
+      setIsVisible(true);
+    }
 
-      // Check if hovering over clickable or interactive element
-      const target = e.target as HTMLElement | null;
+    const updateHoverState = (target: HTMLElement | null) => {
       if (target) {
         const isInteractive = Boolean(
           target.closest('button') ||
@@ -80,13 +85,52 @@ export const CustomCursor: React.FC = () => {
       }
     };
 
+    const handleMouseMove = (e: MouseEvent) => {
+      if (typeof e.clientX !== 'number' || isNaN(e.clientX)) return;
+      mousePos.current.x = e.clientX;
+      mousePos.current.y = e.clientY;
+      setIsVisible(true);
+
+      const target = (e.target as HTMLElement | null) || (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null);
+      updateHoverState(target);
+    };
+
+    // Virtual cursor sync: keeps themed custom cursor perfectly synced with virtual trackpad
+    const handleVirtualCursorMove = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number; isHovering?: boolean }>;
+      if (!ev.detail || typeof ev.detail.x !== 'number') return;
+      mousePos.current.x = ev.detail.x;
+      mousePos.current.y = ev.detail.y;
+      setIsVisible(true);
+      if (typeof ev.detail.isHovering === 'boolean') {
+        setIsHovering(ev.detail.isHovering);
+      }
+    };
+
+    const handleVirtualCursorClick = () => {
+      setIsClicking(true);
+      setTimeout(() => setIsClicking(false), 220);
+    };
+
     const handleMouseDown = () => setIsClicking(true);
     const handleMouseUp = () => setIsClicking(false);
-
     const handleMouseEnterWindow = () => setIsVisible(true);
-    const handleMouseLeaveWindow = () => setIsVisible(false);
+    const handleMouseLeaveWindow = (e: MouseEvent) => {
+      // Only hide if the cursor legitimately moved outside the window boundary
+      // (Never hide on trackpad touches or mobile gestures inside viewport)
+      if (
+        e.clientX <= 0 ||
+        e.clientX >= window.innerWidth ||
+        e.clientY <= 0 ||
+        e.clientY >= window.innerHeight
+      ) {
+        setIsVisible(false);
+      }
+    };
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('virtual-cursor-move', handleVirtualCursorMove);
+    window.addEventListener('virtual-cursor-click', handleVirtualCursorClick);
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('mouseenter', handleMouseEnterWindow);
@@ -97,42 +141,39 @@ export const CustomCursor: React.FC = () => {
       const dx = mousePos.current.x - trailPos.current.x;
       const dy = mousePos.current.y - trailPos.current.y;
 
-      // Buttery passive delay: lerp factor ~0.16
-      trailPos.current.x += dx * 0.16;
-      trailPos.current.y += dy * 0.16;
-      vel.current.x = dx * 0.16;
-      vel.current.y = dy * 0.16;
+      // Smooth lerp factor ~0.18
+      trailPos.current.x += dx * 0.18;
+      trailPos.current.y += dy * 0.18;
+      vel.current.x = dx * 0.18;
+      vel.current.y = dy * 0.18;
 
-      const speed = Math.hypot(vel.current.x, vel.current.y);
+      const angle = Math.atan2(vel.current.y, vel.current.x);
 
-      // Update immediate dot
+      // Update immediate dot / icon
       if (dotRef.current) {
         dotRef.current.style.transform = `translate3d(${mousePos.current.x}px, ${mousePos.current.y}px, 0) translate(-50%, -50%)`;
       }
 
-      // Update delayed trailing ring with subtle speed-stretch
+      // Update delayed trailing ring
       if (ringRef.current) {
-        const angle = Math.atan2(vel.current.y, vel.current.x);
-        const stretch = Math.min(1 + speed * 0.012, 1.35);
-        const squish = Math.max(1 - speed * 0.008, 0.82);
-        
-        ringRef.current.style.transform = `translate3d(${trailPos.current.x}px, ${trailPos.current.y}px, 0) translate(-50%, -50%) rotate(${angle}rad) scale(${stretch}, ${squish})`;
+        ringRef.current.style.transform = `translate3d(${trailPos.current.x}px, ${trailPos.current.y}px, 0) translate(-50%, -50%)`;
       }
 
-      // Spawn dream stardust motes on landing page while moving
-      if (isLanding && speed > 2.5 && time - lastSpawnTime > 75) {
-        lastSpawnTime = time;
-        particleIdCounter.current += 1;
-        setParticles((prev) => [
-          ...prev.slice(-6),
-          {
-            id: particleIdCounter.current,
-            x: mousePos.current.x + (Math.random() - 0.5) * 12,
-            y: mousePos.current.y + (Math.random() - 0.5) * 12,
-            opacity: 0.8,
-            scale: Math.random() * 0.6 + 0.6,
-          },
-        ]);
+      // ── ABOUT ME PAGE: CONTINUOUS BUBBLE STREAM FROM CURSOR ──
+      // Always releases bubbles UNLESS hovering on an element
+      if (isAboutMe && !isHovering && isVisible) {
+        if (time - lastBubbleTime.current > 110) {
+          lastBubbleTime.current = time;
+          bubbleIdCounter.current += 1;
+          const newBubble: CursorBubble = {
+            id: bubbleIdCounter.current,
+            x: mousePos.current.x + (Math.random() - 0.5) * 16,
+            y: mousePos.current.y + (Math.random() - 0.5) * 16,
+            size: Math.random() * 5 + 4,
+            wobble: (Math.random() - 0.5) * 24,
+          };
+          setBubbles((prev) => [...prev.slice(-14), newBubble]);
+        }
       }
 
       animId = requestAnimationFrame(renderLoop);
@@ -143,21 +184,23 @@ export const CustomCursor: React.FC = () => {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('virtual-cursor-move', handleVirtualCursorMove);
+      window.removeEventListener('virtual-cursor-click', handleVirtualCursorClick);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mouseenter', handleMouseEnterWindow);
       document.removeEventListener('mouseleave', handleMouseLeaveWindow);
     };
-  }, [hasMouse, isVisible, isLanding]);
+  }, [hasMouse, isVisible, isAboutMe, isHovering]);
 
-  // Periodic particle cleanup
+  // Periodic bubble cleanup
   useEffect(() => {
-    if (particles.length === 0) return;
+    if (bubbles.length === 0) return;
     const timer = setTimeout(() => {
-      setParticles((prev) => prev.slice(1));
-    }, 450);
+      setBubbles((prev) => prev.slice(1));
+    }, 750);
     return () => clearTimeout(timer);
-  }, [particles]);
+  }, [bubbles]);
 
   if (!hasMouse) return null;
 
@@ -168,151 +211,171 @@ export const CustomCursor: React.FC = () => {
       }`}
       aria-hidden="true"
     >
-      {/* ── PASSIVE DELAYED TRAILING RING ──────────────────────────────────── */}
+      {/* ── 1. ABOUT ME PAGE: RISING BUBBLES FROM CURSOR (Hidden when on elements) ── */}
+      {isAboutMe && !isHovering &&
+        bubbles.map((b) => (
+          <div
+            key={b.id}
+            className="fixed pointer-events-none rounded-full border border-white/70 bg-cyan-200/50 shadow-[0_0_8px_rgba(56,189,248,0.85)] animate-cursor-bubble"
+            style={{
+              left: b.x,
+              top: b.y,
+              width: `${b.size}px`,
+              height: `${b.size}px`,
+              transform: 'translate(-50%, -50%)',
+              '--wobble-x': `${b.wobble}px`,
+            } as React.CSSProperties}
+          >
+            <div className="absolute top-[20%] left-[25%] w-[30%] h-[30%] rounded-full bg-white/90" />
+          </div>
+        ))}
+
+      {/* ── 2. PASSIVE DELAYED TRAILING RING / GLASS CIRCLE ────────────────── */}
       <div
         ref={ringRef}
         className="fixed top-0 left-0 pointer-events-none will-change-transform"
         style={{ transform: 'translate3d(-100px, -100px, 0)' }}
       >
-        {/* 1. LANDING PAGE: Cozy Dream Aura Ring (Amber / Sky Violet Glow) */}
-        {isLanding && (
+        {/* 2A. LANDING & ABOUT ME: Glassy Theme Circle with Blur & Outline */}
+        {(isLanding || isAboutMe) && (
           <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center ${
+            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-white/60 bg-white/10 backdrop-blur-[3px] shadow-[0_0_18px_rgba(255,255,255,0.22),inset_0_0_8px_rgba(255,255,255,0.2)] ${
               isClicking
-                ? 'w-9 h-9 border-2 border-amber-400 bg-amber-400/20 shadow-[0_0_24px_rgba(251,191,36,0.6)]'
+                ? 'w-8 h-8 scale-90'
                 : isHovering
-                ? 'w-13 h-13 border-2 border-sky-400/90 bg-sky-400/15 shadow-[0_0_28px_rgba(56,189,248,0.5),inset_0_0_12px_rgba(255,255,255,0.4)] backdrop-blur-[2px]'
-                : 'w-10 h-10 border-[1.75px] border-amber-300/80 bg-gradient-to-tr from-amber-400/10 via-sky-300/10 to-indigo-400/15 shadow-[0_0_18px_rgba(251,191,36,0.35)]'
+                ? 'w-13 h-13 border-cyan-300/80 bg-cyan-400/15 shadow-[0_0_24px_rgba(6,182,212,0.4)]'
+                : 'w-10 h-10'
             }`}
           >
-            {/* Delicate inner spinning dashed dream orbit */}
-            <div className="w-6 h-6 rounded-full border border-dashed border-white/60 animate-[spin_8s_linear_infinite]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
           </div>
         )}
 
-        {/* 2. JOURNEY / STORY PAGE: Celestial Sky Navigator Reticle (High-contrast cyan & starlight) */}
+        {/* 2B. JOURNEY PAGE: Blur Circle around Paper Airplane */}
         {isJourney && (
           <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center ${
-              isClicking
-                ? 'w-8 h-8 border-2 border-sky-500 bg-sky-500/25 shadow-[0_0_20px_rgba(14,165,233,0.7)]'
-                : isHovering
-                ? 'w-12 h-12 border-2 border-sky-400 bg-white/20 shadow-[0_0_24px_rgba(56,189,248,0.6),0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur-[1px]'
-                : 'w-9 h-9 border-[1.8px] border-sky-500/90 bg-sky-400/10 shadow-[0_0_16px_rgba(56,189,248,0.45),0_1px_4px_rgba(0,0,0,0.2)]'
+            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-300/70 bg-sky-400/10 backdrop-blur-[2.5px] shadow-[0_0_20px_rgba(56,189,248,0.35)] ${
+              isClicking ? 'w-8 h-8 scale-90' : isHovering ? 'w-14 h-14 bg-sky-400/20' : 'w-11 h-11'
             }`}
-          >
-            {/* 4 Cardinal tick marks for celestial navigation precision */}
-            <div className="absolute -top-1 w-1 h-1 rounded-full bg-white shadow-[0_0_4px_#38bdf8]" />
-            <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-white shadow-[0_0_4px_#38bdf8]" />
-            <div className="absolute -left-1 w-1 h-1 rounded-full bg-white shadow-[0_0_4px_#38bdf8]" />
-            <div className="absolute -right-1 w-1 h-1 rounded-full bg-white shadow-[0_0_4px_#38bdf8]" />
-            <div className="w-4 h-4 rounded-full border border-sky-300/60" />
-          </div>
+          />
         )}
 
-        {/* 3. COSMIC SECTOR / EXPLORE WORKS: Sci-Fi Avionics Reticle */}
+        {/* 2C. COSMIC / SPACE PAGE: Blur Circle around Rocket */}
         {isCosmic && (
           <div
-            className={`transition-all duration-300 ease-out flex items-center justify-center ${
-              isClicking
-                ? 'w-9 h-9 rotate-45 border-2 border-emerald-400 bg-emerald-400/20 shadow-[0_0_25px_#34d399]'
-                : isHovering
-                ? 'w-14 h-14 border border-cyan-400/80 bg-cyan-950/30 shadow-[0_0_30px_rgba(6,182,212,0.6)] backdrop-blur-sm'
-                : 'w-11 h-11 border border-cyan-500/60 bg-cyan-950/20 shadow-[0_0_18px_rgba(6,182,212,0.35)]'
+            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-400/70 bg-cyan-500/10 backdrop-blur-[2.5px] shadow-[0_0_22px_rgba(6,182,212,0.4)] ${
+              isClicking ? 'w-8 h-8 scale-90' : isHovering ? 'w-14 h-14 bg-cyan-500/20' : 'w-11 h-11'
             }`}
-          >
-            {/* Tactical avionics corner brackets */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-cyan-300" />
-            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-cyan-300" />
-            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-cyan-300" />
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-cyan-300" />
-            <div className="w-5 h-5 rounded-full border border-dashed border-cyan-400/70 animate-[spin_10s_linear_infinite]" />
-          </div>
+          />
         )}
 
-        {/* 4. PROJECTS PAGE: Prismatic Glass Precision Ring */}
-        {isProjects && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center ${
-              isClicking
-                ? 'w-8 h-8 border-2 border-indigo-500 bg-indigo-500/25 shadow-[0_0_22px_rgba(99,102,241,0.6)]'
-                : isHovering
-                ? 'w-12 h-12 border-2 border-indigo-400/90 bg-indigo-500/15 shadow-[0_0_25px_rgba(99,102,241,0.45)] backdrop-blur-md'
-                : 'w-10 h-10 border-[1.75px] border-indigo-400/70 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 shadow-[0_0_16px_rgba(99,102,241,0.3)]'
-            }`}
-          >
-            <div className="w-5 h-5 rounded-full border border-white/50" />
-          </div>
-        )}
-
-        {/* WORLD MAP PAGE: Celestial Adventurer Compass Ring */}
+        {/* 2D. WORLD MAP PAGE: Glassy Celestial Ring */}
         {isWorld && (
           <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center ${
-              isClicking
-                ? 'w-9 h-9 border-2 border-cyan-400 bg-cyan-400/25 shadow-[0_0_24px_rgba(34,211,238,0.7)]'
-                : isHovering
-                ? 'w-14 h-14 border-2 border-cyan-300 bg-sky-500/20 shadow-[0_0_30px_rgba(56,189,248,0.6),inset_0_0_15px_rgba(255,255,255,0.4)] backdrop-blur-sm'
-                : 'w-11 h-11 border-[1.8px] border-cyan-400/80 bg-gradient-to-tr from-cyan-500/15 via-indigo-500/15 to-purple-500/15 shadow-[0_0_20px_rgba(56,189,248,0.45)]'
+            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-purple-300/60 bg-purple-500/10 backdrop-blur-[2px] shadow-[0_0_18px_rgba(168,85,247,0.35)] ${
+              isClicking ? 'w-8 h-8 scale-90' : isHovering ? 'w-14 h-14 border-purple-400 bg-purple-500/20' : 'w-10 h-10'
             }`}
-          >
-            {/* Spinning mini compass crosshair */}
-            <div className="w-5 h-5 rounded-full border border-dashed border-cyan-300/80 animate-[spin_10s_linear_infinite]" />
-            <div className="absolute w-1.5 h-1.5 rounded-full bg-cyan-200 shadow-[0_0_6px_#38bdf8]" />
-          </div>
+          />
         )}
 
-        {/* 5. DEFAULT / OTHER PAGES: Elegant Frosted Glass Orb */}
-        {!isLanding && !isWorld && !isJourney && !isCosmic && !isProjects && (
+        {/* 2E. OTHER PAGES */}
+        {!isLanding && !isAboutMe && !isJourney && !isCosmic && !isWorld && (
           <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center ${
-              isHovering
-                ? 'w-12 h-12 border-2 border-sky-400/80 bg-white/25 shadow-[0_0_20px_rgba(56,189,248,0.4)] backdrop-blur-md'
-                : 'w-9 h-9 border border-slate-700/50 bg-white/10 shadow-md'
+            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-white/50 bg-white/10 backdrop-blur-[2px] ${
+              isHovering ? 'w-12 h-12' : 'w-9 h-9'
             }`}
           />
         )}
       </div>
 
-      {/* ── IMMEDIATE SHARP MOUSE NUCLEUS POINT ─────────────────────────────── */}
+      {/* ── 3. IMMEDIATE CURSOR POINT / THEMED ICONS ────────────────────────── */}
       <div
         ref={dotRef}
-        className="fixed top-0 left-0 pointer-events-none will-change-transform z-10"
+        className="fixed top-0 left-0 pointer-events-none will-change-transform z-10 flex items-center justify-center"
         style={{ transform: 'translate3d(-100px, -100px, 0)' }}
       >
-        <div
-          className={`rounded-full transition-all duration-150 ${
-            isLanding
-              ? 'w-2 h-2 bg-amber-400 shadow-[0_0_8px_#fde047]'
-              : isWorld
-              ? 'w-2 h-2 bg-cyan-300 shadow-[0_0_8px_#38bdf8]'
-              : isJourney
-              ? 'w-2 h-2 bg-sky-500 shadow-[0_0_8px_#38bdf8,0_0_2px_#000]'
-              : isCosmic
-              ? 'w-1.5 h-1.5 bg-cyan-300 shadow-[0_0_8px_#22d3ee]'
-              : isProjects
-              ? 'w-2 h-2 bg-indigo-400 shadow-[0_0_8px_#818cf8]'
-              : 'w-2 h-2 bg-slate-800 dark:bg-white shadow-sm'
-          } ${isClicking ? 'scale-150' : isHovering ? 'scale-75 opacity-70' : 'scale-100'}`}
-        />
-      </div>
-
-      {/* ── DREAM STARDUST TRAIL (Landing Page Living Effect) ───────────────── */}
-      {isLanding &&
-        particles.map((p) => (
+        {/* 3A. JOURNEY PAGE: PAPER AIRPLANE CURSOR ICON */}
+        {isJourney ? (
           <div
-            key={p.id}
-            className="fixed pointer-events-none rounded-full bg-amber-200/90 shadow-[0_0_6px_#fde047] transition-all duration-500 ease-out"
-            style={{
-              left: p.x,
-              top: p.y,
-              width: `${p.scale * 3.5}px`,
-              height: `${p.scale * 3.5}px`,
-              opacity: p.opacity,
-              transform: 'translate(-50%, -50%)',
-            }}
+            className={`transition-transform duration-200 ${
+              isClicking ? 'scale-90 rotate-[-12deg]' : isHovering ? 'scale-125' : 'scale-100'
+            }`}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="drop-shadow-[0_2px_8px_rgba(14,165,233,0.7)]"
+            >
+              <path
+                d="M 2 12 L 22 2 L 12 22 L 10 14 L 2 12 Z"
+                fill="#ffffff"
+                stroke="#38bdf8"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M 22 2 L 10 14"
+                stroke="#0284c7"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        ) : isCosmic ? (
+          /* 3B. SPACE / COSMIC PAGE: ROCKET CURSOR ICON */
+          <div
+            className={`transition-transform duration-200 ${
+              isClicking ? 'scale-90' : isHovering ? 'scale-125' : 'scale-100'
+            }`}
+          >
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="drop-shadow-[0_2px_10px_rgba(6,182,212,0.8)] -rotate-45"
+            >
+              <path
+                d="M12 2C8 4 6 8 6 12L4 14V17L7 16L9 18H12L14 14C14 10 12 6 12 2Z"
+                fill="#ffffff"
+                stroke="#06b6d4"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12 2C16 4 18 8 18 12L20 14V17L17 16L15 18H12"
+                fill="#e0f2fe"
+                stroke="#06b6d4"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+              <circle cx="12" cy="9" r="1.5" fill="#0284c7" />
+              {/* Rocket engine flame */}
+              <motion.path
+                d="M10 18 L12 23 L14 18 Z"
+                fill="#f59e0b"
+                animate={{ scaleY: [1, 1.4, 0.9, 1] }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              />
+            </svg>
+          </div>
+        ) : (
+          /* 3C. STANDARD CURSOR DOT */
+          <div
+            className={`rounded-full transition-all duration-150 ${
+              isLanding
+                ? 'w-2 h-2 bg-amber-300 shadow-[0_0_8px_#fde047]'
+                : isAboutMe
+                ? 'w-2 h-2 bg-cyan-300 shadow-[0_0_8px_#38bdf8]'
+                : isWorld
+                ? 'w-2 h-2 bg-purple-300 shadow-[0_0_8px_#c084fc]'
+                : 'w-2 h-2 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]'
+            } ${isClicking ? 'scale-150' : isHovering ? 'scale-75 opacity-70' : 'scale-100'}`}
           />
-        ))}
+        )}
+      </div>
     </div>
   );
 };

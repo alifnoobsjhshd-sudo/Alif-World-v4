@@ -36,6 +36,7 @@ import { AboutMePage } from './pages/AboutMePage';
 import { NotAvailablePage } from './pages/NotAvailablePage';
 import { dreamAudio } from './utils/audio';
 import { CustomCursor } from './components/CustomCursor';
+import { VirtualCursorPad } from './components/VirtualCursorPad';
 
 const MAX_DEPTH = (STORY_SCENES.length - 1) * SCENE_STEP; // 15 * 3800 = 57,000
 
@@ -412,6 +413,7 @@ export default function App() {
   return (
     <>
       <CustomCursor />
+      <VirtualCursorPad />
       <AnimatePresence>
         {initialLoading && (
           <LoadingScreen onComplete={() => setInitialLoading(false)} />

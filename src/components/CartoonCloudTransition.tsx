@@ -212,19 +212,16 @@ export const CartoonCloudTransition: React.FC<CartoonCloudTransitionProps> = ({
           style={{ willChange: 'opacity' }}
         >
           <motion.div
-            className="flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/90 border border-sky-100 shadow-md"
-            initial={{ opacity: 0, scale: 0.95 }}
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-white/95 border border-sky-100 shadow-md"
+            initial={{ opacity: 0, scale: 0.85 }}
             animate={
               stage === 'covered'
                 ? { opacity: 1, scale: 1 }
-                : { opacity: 0, scale: 0.95 }
+                : { opacity: 0, scale: 0.85 }
             }
             transition={{ duration: 0.3 }}
           >
-            <Sparkles className="w-4 h-4 text-sky-500 animate-spin" />
-            <span className="font-display font-bold text-xs sm:text-sm tracking-widest text-sky-800 uppercase">
-              Entering the Sky Journey
-            </span>
+            <Sparkles className="w-5 h-5 text-sky-500 animate-spin" />
           </motion.div>
         </motion.div>
       </div>

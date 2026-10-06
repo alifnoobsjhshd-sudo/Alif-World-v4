@@ -11,7 +11,6 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SpaceBackground } from '../components/SpaceBackground';
 import { SpaceRocket } from '../components/SpaceRocket';
-import { RocketLaunchTransition } from '../components/RocketLaunchTransition';
 import { SpaceAvionicsHUD, SpaceWaypoint } from '../components/SpaceAvionicsHUD';
 import { SpaceSpeedVisualEffects } from '../components/SpaceSpeedVisualEffects';
 import { KenoStoreSection } from '../components/space-projects/KenoStoreSection';
@@ -21,6 +20,7 @@ import { OtherWebsitesSection } from '../components/space-projects/OtherWebsites
 import { Section } from '../components/Section';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
+import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 
 const MAX_SPACE_DEPTH = 36000;
 const KENO_STORE_DEPTH = 4500;
@@ -43,7 +43,6 @@ interface SpaceRipple {
 
 export const ExploreWorksPage: React.FC = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const [ripples, setRipples] = useState<SpaceRipple[]>([]);
   const [isSpeedEffectActive, setIsSpeedEffectActive] = useState(false);
@@ -393,16 +392,6 @@ export const ExploreWorksPage: React.FC = () => {
         keywords="alif work, alif world, alif portfolio, zenox portfolio, cosmic web projects, creative frontend developer, interactive portfolio"
       />
 
-      {/* ── 0. COSMIC ROCKET LAUNCH LANDING / LOADING TRANSITION ───────────── */}
-      <AnimatePresence mode="wait">
-        {isLoading && (
-          <RocketLaunchTransition
-            isActive={isLoading}
-            onComplete={() => setIsLoading(false)}
-          />
-        )}
-      </AnimatePresence>
-
       {/* ── 1. CINEMATIC SPACE BACKDROP (SUBTLE ZOOM OUT ON WARP) ───────── */}
       <motion.div
         animate={{ scale: isSpeedEffectActive ? 0.95 : 1.0 }}
@@ -454,19 +443,18 @@ export const ExploreWorksPage: React.FC = () => {
       <header className="fixed top-4 left-4 sm:left-6 right-4 sm:right-6 z-50 flex items-center justify-between pointer-events-none">
         {/* Back Button */}
         <div className="pointer-events-auto">
-          <motion.button
-            type="button"
+          <MagneticShimmerButton
+            variant="glass"
+            size="sm"
             onClick={handleBack}
             onMouseEnter={() => dreamAudio.playHover()}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/80 hover:bg-slate-900 backdrop-blur-md border border-slate-700/80 hover:border-cyan-500/50 shadow-lg text-slate-200 hover:text-white transition-all text-xs font-mono cursor-pointer"
-            title="Return to journey page"
+            title="Return to world page"
             aria-label="Back"
+            className="text-slate-200"
           >
             <ArrowLeft className="w-4 h-4 text-sky-400" />
-            <span className="tracking-wider">BACK</span>
-          </motion.button>
+            <span className="tracking-wider text-xs font-mono">BACK</span>
+          </MagneticShimmerButton>
         </div>
 
         {/* Center: Branding & Heading (H1) for Search Engines */}
@@ -484,13 +472,11 @@ export const ExploreWorksPage: React.FC = () => {
 
         {/* Audio Mute/Unmute */}
         <div className="pointer-events-auto">
-          <motion.button
-            type="button"
+          <MagneticShimmerButton
+            variant="glass"
+            size="icon"
             onClick={toggleAudio}
             onMouseEnter={() => dreamAudio.playHover()}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            className="w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 backdrop-blur-md border border-slate-700/80 hover:border-cyan-500/50 shadow-lg text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer"
             title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
             aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
           >
@@ -499,7 +485,7 @@ export const ExploreWorksPage: React.FC = () => {
             ) : (
               <Volume2 className="w-4 h-4 text-sky-400" />
             )}
-          </motion.button>
+          </MagneticShimmerButton>
         </div>
       </header>
 
