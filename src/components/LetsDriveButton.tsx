@@ -19,27 +19,27 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Proximity lighting states
-  const [proximity, setProximity] = useState(0);
   const [conicAngle, setConicAngle] = useState(0);
-  const [spread, setSpread] = useState(35);
+  const [spread, setSpread] = useState(24);
   const [isHovered, setIsHovered] = useState(false);
+  const [proximityFactor, setProximityFactor] = useState(0.1);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
-  // Magnetic spring physics
+  // Magnetic spring physics for 3D tilt without resizing
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const springConfig = { stiffness: 220, damping: 18, mass: 0.35 };
   const smoothX = useSpring(mouseX, springConfig);
   const smoothY = useSpring(mouseY, springConfig);
-  const rotateX = useTransform(smoothY, [-18, 18], [6, -6]);
-  const rotateY = useTransform(smoothX, [-18, 18], [-6, 6]);
+  const rotateX = useTransform(smoothY, [-18, 18], [5, -5]);
+  const rotateY = useTransform(smoothX, [-18, 18], [-5, 5]);
 
   useEffect(() => {
     const isTouch = 'ontouchstart' in window && window.innerWidth < 1024;
     setIsTouchDevice(isTouch);
   }, []);
 
-  // ── Global Mouse/Cursor Tracker for Distance-Based Nearest-Side Lighting ──
+  // ── Global Mouse/Cursor Tracker: Nearest side lights up at all distances ──
   const handleGlobalPointerMove = useCallback((e: MouseEvent | PointerEvent) => {
     if (!containerRef.current) return;
 
@@ -55,8 +55,8 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
 
     if (inside) {
       setIsHovered(true);
-      setProximity(1);
       setSpread(360);
+      setProximityFactor(1);
       return;
     }
 
@@ -67,22 +67,21 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     const dy = Math.max(rect.top - my, 0, my - rect.bottom);
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Maximum influence distance (lights up gradually as cursor approaches within 420px)
-    const maxDist = 420;
-    const prox = Math.max(0, Math.min(1, 1 - dist / maxDist));
-    setProximity(prox);
+    // Continuous proximity ratio from 0 (very far) to 1 (touching edge)
+    const maxDistanceScale = 850;
+    const prox = Math.max(0, Math.min(1, 1 - dist / maxDistanceScale));
+    setProximityFactor(prox);
 
-    // Calculate angle from button center to mouse
-    // Conic gradient 0deg starts at 12 o'clock (top), 90deg is 3 o'clock (right)
+    // Calculate angle from button center to mouse (conic 0deg is top, 90deg is right)
     const angleRad = Math.atan2(my - cy, mx - cx);
     const angleDeg = (angleRad * 180) / Math.PI;
     const normConic = (angleDeg + 90 + 360) % 360;
     setConicAngle(normConic);
 
-    // Dynamic light beam spread angle:
-    // When far away: tight focus (approx 32deg) concentrated strictly on the closest edge
-    // When closer: broadens up to ~155deg covering the near face and corners
-    const currentSpread = 32 + prox * 125;
+    // Light spread angle:
+    // When farther: small lit up area (approx 22deg - 26deg focused strictly on nearest side)
+    // When closer: expands up to ~150deg covering the nearest face
+    const currentSpread = 22 + prox * 128;
     setSpread(currentSpread);
   }, []);
 
@@ -103,7 +102,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     };
   }, [handleGlobalPointerMove]);
 
-  // Magnetic hover tracking inside button
+  // Subtle 3D magnetic tilt tracking (no button size change)
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (isTouchDevice) return;
     const button = buttonRef.current;
@@ -115,14 +114,14 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
 
     const diffX = e.clientX - (rect.left + centerX);
     const diffY = e.clientY - (rect.top + centerY);
-    mouseX.set(Math.max(-18, Math.min(18, diffX * 0.3)));
-    mouseY.set(Math.max(-18, Math.min(18, diffY * 0.3)));
+    mouseX.set(Math.max(-16, Math.min(16, diffX * 0.25)));
+    mouseY.set(Math.max(-16, Math.min(16, diffY * 0.25)));
   };
 
   const handlePointerEnter = () => {
     setIsHovered(true);
-    setProximity(1);
     setSpread(360);
+    setProximityFactor(1);
     if (onMouseEnter) onMouseEnter();
   };
 
@@ -133,47 +132,34 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   };
 
   // Gradient definitions:
-  // 1. Hovered: Full vibrant 360deg emerald/teal/amber outline
-  // 2. Proximity: Conic gradient starting and ending transparent, with brilliant emerald peak facing cursor
+  // 1. On button (hovered): Full 360deg vibrant rainbow emerald/cyan/amber outline
+  // 2. Farther: Outline lights up on the nearest side facing the cursor, small lit area, expands as cursor gets closer
   const outlineGradient = isHovered
-    ? 'conic-gradient(from 0deg, #10b981, #34d399, #6ee7b7, #38bdf8, #a7f3d0, #10b981)'
-    : proximity > 0.02
-    ? `conic-gradient(from ${conicAngle - spread / 2}deg, transparent 0deg, rgba(52,211,153,0.15) ${spread * 0.15}deg, rgba(110,231,183,1) ${spread * 0.5}deg, rgba(52,211,153,0.15) ${spread * 0.85}deg, transparent ${spread}deg, transparent 360deg)`
-    : 'rgba(52,211,153,0.22)';
+    ? 'conic-gradient(from 0deg at 50% 50%, #10b981, #34d399, #6ee7b7, #38bdf8, #a7f3d0, #fde047, #10b981)'
+    : `conic-gradient(from ${conicAngle - spread / 2}deg at 50% 50%, rgba(52,211,153,0.2) 0deg, rgba(52,211,153,0.35) ${spread * 0.15}deg, #a7f3d0 ${spread * 0.35}deg, #ffffff ${spread * 0.5}deg, #6ee7b7 ${spread * 0.65}deg, rgba(52,211,153,0.35) ${spread * 0.85}deg, rgba(52,211,153,0.2) ${spread}deg, rgba(52,211,153,0.2) 360deg)`;
+
+  const ambientGlow = isHovered
+    ? 'radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.85) 0%, rgba(16,185,129,0.4) 65%, transparent 100%)'
+    : `conic-gradient(from ${conicAngle - spread / 2}deg at 50% 50%, transparent 0deg, rgba(52,211,153,0.8) ${spread * 0.5}deg, transparent ${spread}deg, transparent 360deg)`;
 
   return (
     <div
       ref={containerRef}
-      className={`relative inline-flex items-center justify-center p-[2.5px] rounded-2xl sm:rounded-3xl select-none group ${className}`}
+      className={`relative inline-flex items-center justify-center p-[2.5px] rounded-2xl sm:rounded-3xl select-none group transition-shadow duration-200 ${className}`}
+      style={{
+        background: outlineGradient,
+      }}
     >
-      {/* ── 1. AMBIENT SOFT DIRECTIONAL GLOW (Casts emerald light toward the cursor) ── */}
+      {/* ── 1. AMBIENT SOFT DIRECTIONAL GLOW (Casts emerald light facing the cursor) ── */}
       <div
-        className="absolute -inset-[3.5px] rounded-2xl sm:rounded-3xl pointer-events-none transition-opacity duration-150 filter blur-[9px]"
+        className="absolute -inset-[3.5px] rounded-2xl sm:rounded-3xl pointer-events-none filter blur-[8px] transition-opacity duration-150"
         style={{
-          background: isHovered
-            ? 'radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.7) 0%, rgba(16,185,129,0.35) 70%, transparent 100%)'
-            : proximity > 0.05
-            ? `conic-gradient(from ${conicAngle - spread / 2}deg, transparent 0deg, rgba(16,185,129,0.85) ${spread * 0.5}deg, transparent ${spread}deg, transparent 360deg)`
-            : 'transparent',
-          opacity: isHovered ? 0.95 : proximity * 0.85,
+          background: ambientGlow,
+          opacity: isHovered ? 0.95 : Math.max(0.4, 0.35 + proximityFactor * 0.6),
         }}
       />
 
-      {/* ── 2. CURSOR-FOLLOW GRADIENT OUTLINE STROKE ───────────────────────────── */}
-      {/* Lights up the nearest edge facing the cursor, expands with proximity, full on hover */}
-      <div
-        className="absolute inset-0 rounded-2xl sm:rounded-3xl pointer-events-none transition-opacity duration-100 will-change-transform"
-        style={{
-          padding: '2.5px',
-          background: outlineGradient,
-          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-          WebkitMaskComposite: 'xor',
-          maskComposite: 'exclude',
-          opacity: isHovered ? 1 : Math.max(0.2, proximity * 1.15),
-        }}
-      />
-
-      {/* ── 3. BUTTON BODY: "LET'S DRIVE" WITH 3D MAGNETIC TILT & LIQUID SHIMMER ── */}
+      {/* ── 2. BUTTON BODY: FIXED STABLE SIZE (NO SIZE CHANGE IN ANY ANIMATION) ── */}
       <motion.button
         ref={buttonRef}
         type="button"
@@ -190,8 +176,9 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
           rotateY: isTouchDevice ? 0 : rotateY,
           transformStyle: 'preserve-3d',
         }}
-        whileTap={{ scale: 0.94 }}
-        className="relative w-56 xs:w-64 sm:w-72 md:w-76 lg:w-80 py-3.5 sm:py-4 px-5 sm:px-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white font-display font-black tracking-wider uppercase text-xs xs:text-sm sm:text-base lg:text-lg flex items-center justify-center gap-2.5 overflow-hidden cursor-pointer shadow-[0_12px_32px_rgba(16,185,129,0.38)] active:shadow-sm will-change-transform"
+        whileTap={{ scale: 1 }}
+        whileHover={{ scale: 1 }}
+        className="relative w-56 xs:w-64 sm:w-72 md:w-76 lg:w-80 h-12 sm:h-14 rounded-[calc(1rem-2.5px)] sm:rounded-[calc(1.5rem-2.5px)] bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white font-display font-black tracking-wider uppercase text-xs xs:text-sm sm:text-base lg:text-lg flex items-center justify-center gap-2.5 overflow-hidden cursor-pointer shadow-[0_10px_28px_rgba(16,185,129,0.32)] active:shadow-sm select-none"
       >
         {/* Specular Liquid Wave Shimmer */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ borderRadius: 'inherit' }}>
@@ -215,7 +202,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
           style={{ borderRadius: 'inherit' }}
         />
 
-        {/* Content */}
+        {/* Button Content */}
         <Compass className="w-5 h-5 text-emerald-100 group-hover:rotate-45 transition-transform duration-500 shrink-0 drop-shadow" />
         <span className="drop-shadow-md whitespace-nowrap">
           LET'S DRIVE

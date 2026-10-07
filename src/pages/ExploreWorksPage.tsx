@@ -384,7 +384,7 @@ export const ExploreWorksPage: React.FC = () => {
   return (
     <div
       onClick={handleSpaceClick}
-      className="relative w-screen h-screen overflow-hidden bg-[#030718] text-white font-display select-none cursor-crosshair"
+      className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-[#030718] text-white font-display select-none touch-none overscroll-none"
     >
       <SEO
         title="Explore Works | Alif World &amp; Projects (Zenox Portfolio)"
@@ -453,7 +453,7 @@ export const ExploreWorksPage: React.FC = () => {
             className="text-slate-200"
           >
             <ArrowLeft className="w-4 h-4 text-sky-400" />
-            <span className="tracking-wider text-xs font-mono">BACK</span>
+            <span className="tracking-wider text-xs font-mono">Back</span>
           </MagneticShimmerButton>
         </div>
 

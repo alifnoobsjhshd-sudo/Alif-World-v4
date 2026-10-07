@@ -287,7 +287,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   }, [depthValue, isContactOpen, isRocketLaunching]);
 
   return (
-    <div className="relative bg-[#f8f8f8] text-gray-800 font-sans selection:bg-blue-100 h-screen w-screen overflow-hidden">
+    <div className="relative bg-[#f8f8f8] text-gray-800 font-sans selection:bg-blue-100 h-screen h-[100dvh] w-screen overflow-hidden touch-none overscroll-none">
       <SEO 
         title="Alif-World | Alif Portfolio Story Journey (Zenox Portfolio)"
         description="Experience the cinematic sky storyline of Alif (Zenox). Discover the creative milestones, development passion, and interactive frontend works of Alif-World."

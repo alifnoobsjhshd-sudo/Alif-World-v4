@@ -1,20 +1,35 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLocation } from 'react-router-dom';
 import { MousePointer, Move, Zap, Crosshair, ChevronDown, ChevronUp, RotateCcw, Power } from 'lucide-react';
 
 export const isVirtualCursorEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
-  // If explicitly disabled via localStorage or query parameter
+  // If explicitly requested via query parameter
   const search = new URLSearchParams(window.location.search);
-  if (search.get('CURSER') === 'false' || search.get('curser') === 'false' || search.get('cursor') === 'false') return false;
-  if (localStorage.getItem('CURSER') === 'false' || localStorage.getItem('curser') === 'false' || localStorage.getItem('cursor') === 'false') return false;
+  const q = search.get('CURSER') || search.get('curser') || search.get('cursor');
+  if (q === 'true') return true;
+  if (q === 'false') return false;
 
-  // Active by default for interaction testing
-  return true;
+  const ls = localStorage.getItem('CURSER') || localStorage.getItem('curser') || localStorage.getItem('cursor');
+  if (ls === 'true') return true;
+  if (ls === 'false') return false;
+
+  // Check build/environment variables
+  const envVal = (typeof process !== 'undefined' && process.env?.CURSER) || (import.meta as any).env?.VITE_CURSER || (import.meta as any).env?.CURSER;
+  if (envVal === 'true' || envVal === true) return true;
+
+  return false;
 };
 
 export const VirtualCursorPad: React.FC = () => {
+  const location = useLocation();
   const [enabled, setEnabled] = useState(true);
+
+  const path = location.pathname.toLowerCase();
+  const isJourney = path.startsWith('/journey') || path.startsWith('/story');
+  const isCosmic = path.startsWith('/explore-work') || path.startsWith('/space');
+  const hideReticle = isJourney || isCosmic;
 
   // Virtual cursor coordinates on screen
   const [cursorPos, setCursorPos] = useState({
@@ -22,13 +37,13 @@ export const VirtualCursorPad: React.FC = () => {
     y: typeof window !== 'undefined' ? Math.round(window.innerHeight / 2) : 400,
   });
 
-  // Touchpad window position on screen (draggable anywhere)
-  const [padPos, setPadPos] = useState({
-    x: 20,
-    y: typeof window !== 'undefined' ? Math.max(70, window.innerHeight - 340) : 400,
-  });
+  // Touchpad window position on screen (draggable anywhere, starts docked neatly on mobile)
+  const [padPos, setPadPos] = useState(() => ({
+    x: typeof window !== 'undefined' ? (window.innerWidth < 640 ? 12 : 24) : 20,
+    y: typeof window !== 'undefined' ? (window.innerWidth < 640 ? Math.max(70, window.innerHeight - 260) : Math.max(70, window.innerHeight - 340)) : 400,
+  }));
 
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const [isDraggingPad, setIsDraggingPad] = useState(false);
   const [isClicking, setIsClicking] = useState(false);
   const [sensitivity, setSensitivity] = useState<number>(1.8);
@@ -37,6 +52,7 @@ export const VirtualCursorPad: React.FC = () => {
   const padDragStartRef = useRef<{ startX: number; startY: number; padStartX: number; padStartY: number } | null>(null);
   const lastTouchRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
+  const lastHoverTargetRef = useRef<HTMLElement | null>(null);
 
   const cursorPosRef = useRef(cursorPos);
   cursorPosRef.current = cursorPos;
@@ -60,7 +76,19 @@ export const VirtualCursorPad: React.FC = () => {
     const clampedX = Math.max(1, Math.min(window.innerWidth - 1, Math.round(x)));
     const clampedY = Math.max(1, Math.min(window.innerHeight - 1, Math.round(y)));
 
-    const target = document.elementFromPoint(clampedX, clampedY) || document.body;
+    const target = (document.elementFromPoint(clampedX, clampedY) || document.body) as HTMLElement;
+
+    // Dispatch hover enter/leave when target element changes
+    if (lastHoverTargetRef.current && lastHoverTargetRef.current !== target) {
+      lastHoverTargetRef.current.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false, clientX: clampedX, clientY: clampedY }));
+      lastHoverTargetRef.current.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: clampedX, clientY: clampedY }));
+    }
+    if (target && target !== lastHoverTargetRef.current) {
+      target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: clampedX, clientY: clampedY }));
+      target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: clampedX, clientY: clampedY }));
+      target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, clientX: clampedX, clientY: clampedY }));
+      lastHoverTargetRef.current = target;
+    }
 
     // Update hovered element tag for HUD
     const tag = target.tagName ? target.tagName.toLowerCase() : 'element';
@@ -79,6 +107,7 @@ export const VirtualCursorPad: React.FC = () => {
       target.closest('[role="button"]') ||
       target.closest('[role="link"]') ||
       target.closest('.cursor-pointer') ||
+      target.closest('[title]') ||
       target.closest('summary')
     );
 
@@ -259,58 +288,59 @@ export const VirtualCursorPad: React.FC = () => {
 
   return (
     <>
-      {/* ── 1. ALWAYS-VISIBLE VIRTUAL CURSOR RETICLE ON SCREEN ──────────────────── */}
-      {/* Will NEVER hide after touching the touch pad */}
-      <div
-        className="fixed pointer-events-none z-[100000] select-none will-change-transform"
-        style={{
-          left: cursorPos.x,
-          top: cursorPos.y,
-          transform: 'translate(-4px, -4px)',
-        }}
-      >
-        <div className="relative">
-          {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
-          <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
+      {/* ── 1. VIRTUAL CURSOR RETICLE ON SCREEN (Hidden on Journey & Space pages) ── */}
+      {!hideReticle && (
+        <div
+          className="fixed pointer-events-none z-[100000] select-none will-change-transform"
+          style={{
+            left: cursorPos.x,
+            top: cursorPos.y,
+            transform: 'translate(-4px, -4px)',
+          }}
+        >
+          <div className="relative">
+            {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
+            <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
 
-          {/* Main Pointer Arrow SVG */}
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            className={`drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
-              isClicking ? 'scale-90 rotate-[-8deg]' : 'scale-100'
-            }`}
-          >
-            <path
-              d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z"
-              fill="#06b6d4"
-              stroke="#ffffff"
-              strokeWidth="2.2"
-              strokeLinejoin="round"
-            />
-          </svg>
-
-          {/* Click Ripple Indicator */}
-          <AnimatePresence>
-            {isClicking && (
-              <motion.div
-                initial={{ scale: 0.2, opacity: 1 }}
-                animate={{ scale: 3.2, opacity: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full border-2 border-cyan-300 bg-cyan-400/40"
+            {/* Main Pointer Arrow SVG */}
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              className={`drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
+                isClicking ? 'scale-90 rotate-[-8deg]' : 'scale-100'
+              }`}
+            >
+              <path
+                d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z"
+                fill="#06b6d4"
+                stroke="#ffffff"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
               />
-            )}
-          </AnimatePresence>
+            </svg>
 
-          {/* Target Reticle Coordinates Tag */}
-          <div className="absolute top-5 left-4 whitespace-nowrap px-1.5 py-0.5 rounded bg-slate-950/90 border border-cyan-500/50 text-[10px] font-mono text-cyan-200 shadow-md pointer-events-none backdrop-blur-md">
-            {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
+            {/* Click Ripple Indicator */}
+            <AnimatePresence>
+              {isClicking && (
+                <motion.div
+                  initial={{ scale: 0.2, opacity: 1 }}
+                  animate={{ scale: 3.2, opacity: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="absolute -top-3.5 -left-3.5 w-9 h-9 rounded-full border-2 border-cyan-300 bg-cyan-400/40"
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Target Reticle Coordinates Tag */}
+            <div className="absolute top-5 left-4 whitespace-nowrap px-1.5 py-0.5 rounded bg-slate-950/90 border border-cyan-500/50 text-[10px] font-mono text-cyan-200 shadow-md pointer-events-none backdrop-blur-md">
+              {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── 2. DRAGGABLE VIRTUAL TOUCHPAD CONTROLLER WINDOW ────────────────────── */}
       <div
@@ -322,7 +352,7 @@ export const VirtualCursorPad: React.FC = () => {
       >
         <div
           className={`flex flex-col bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.65),0_0_20px_rgba(6,182,212,0.25)] text-slate-100 font-sans transition-all duration-200 overflow-hidden ${
-            isMinimized ? 'w-56' : 'w-72 sm:w-80'
+            isMinimized ? 'w-52 xs:w-56' : 'w-64 xs:w-72 sm:w-80'
           }`}
         >
           {/* Header Drag Handle Bar (Grab here to move pad to any place) */}

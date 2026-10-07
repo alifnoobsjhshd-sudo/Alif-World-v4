@@ -24,6 +24,10 @@ import {
 export const WorldPage: React.FC = () => {
   const navigate = useNavigate();
   const clusterRef = useRef<HTMLDivElement>(null);
+  const storyIslandRef = useRef<HTMLDivElement>(null);
+  const worksIslandRef = useRef<HTMLDivElement>(null);
+  const aboutIslandRef = useRef<HTMLDivElement>(null);
+  const hoveredIslandRef = useRef<'story' | 'about' | 'works' | null>(null);
   const [zoomingIsland, setZoomingIsland] = useState<'story' | 'about' | 'works' | null>(null);
   const [activeTransition, setActiveTransition] = useState<'story' | 'about' | 'works' | null>(null);
   const [zoomOrigin, setZoomOrigin] = useState<string>('50% 50%');
@@ -92,6 +96,31 @@ export const WorldPage: React.FC = () => {
       const normY = (y / innerHeight) * 2 - 1;
       mouseX.set(normX);
       mouseY.set(normY);
+
+      // Hit-testing for island interaction glow (works for both real mouse and virtual cursor)
+      const checkHit = (ref: React.RefObject<HTMLDivElement | null>) => {
+        if (!ref.current) return false;
+        const r = ref.current.getBoundingClientRect();
+        const pad = 18;
+        return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+      };
+
+      let newHover: 'story' | 'about' | 'works' | null = null;
+      if (checkHit(storyIslandRef)) {
+        newHover = 'story';
+      } else if (checkHit(worksIslandRef)) {
+        newHover = 'works';
+      } else if (checkHit(aboutIslandRef)) {
+        newHover = 'about';
+      }
+
+      if (newHover !== hoveredIslandRef.current) {
+        hoveredIslandRef.current = newHover;
+        setHoveredIsland(newHover);
+        if (newHover) {
+          dreamAudio.playHover();
+        }
+      }
     };
 
     const handlePointerMove = (e: MouseEvent) => {
@@ -100,7 +129,9 @@ export const WorldPage: React.FC = () => {
 
     const handleVirtual = (e: Event) => {
       const ev = e as CustomEvent<{ x: number; y: number }>;
-      if (ev.detail) handleMove(ev.detail.x, ev.detail.y);
+      if (ev.detail && typeof ev.detail.x === 'number') {
+        handleMove(ev.detail.x, ev.detail.y);
+      }
     };
 
     window.addEventListener('mousemove', handlePointerMove, { passive: true });
@@ -160,7 +191,7 @@ export const WorldPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-slate-900 select-none flex flex-col justify-between">
+    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-slate-900 select-none flex flex-col justify-between touch-none overscroll-none">
       <SEO
         title="Alif's Dream Realm · Floating Islands"
         description="Explore Alif's 3 connected floating sky islands: The Story, More About Him, and My Works."
@@ -239,7 +270,7 @@ export const WorldPage: React.FC = () => {
 
         {/* Ethereal atmosphere lighting (Sun removed as requested) */}
         <div className="absolute inset-0 bg-gradient-to-b from-sky-400/20 via-sky-600/10 to-indigo-950/45 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-sky-900/15" />
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-sky-900/15" />
       </motion.div>
 
       {/* ── ANIMATED AIR WAVES & WIND CURRENTS RIPPLES IN THE SKY ─────────────── */}
@@ -383,10 +414,10 @@ export const WorldPage: React.FC = () => {
               d="M 50 20 C 58 24, 72 32, 70 42 C 68 52, 78 56, 86 68"
               fill="none"
               stroke="#0f172a"
-              strokeWidth="1.15"
+              strokeWidth="0.75"
               strokeLinecap="round"
-              strokeDasharray="4 3.5"
-              opacity="0.88"
+              strokeDasharray="3.5 3"
+              opacity="0.9"
             />
 
             {/* Storybook Whimsical Dashed Curve 2: About Me (86, 68) -> My Works (14, 68) */}
@@ -394,16 +425,16 @@ export const WorldPage: React.FC = () => {
               d="M 86 68 C 74 78, 62 60, 50 72 C 38 84, 26 58, 14 68"
               fill="none"
               stroke="#0f172a"
-              strokeWidth="1.15"
+              strokeWidth="0.75"
               strokeLinecap="round"
-              strokeDasharray="4 3.5"
-              opacity="0.88"
+              strokeDasharray="3.5 3"
+              opacity="0.9"
             />
 
             {/* Delicate Waypoint Story Pins */}
-            <circle cx="50" cy="20" r="1.75" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
-            <circle cx="86" cy="68" r="1.5" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
-            <circle cx="14" cy="68" r="1.5" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
+            <circle cx="50" cy="20" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="86" cy="68" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="14" cy="68" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
           </svg>
 
           {/* Mobile Connecting Paths (Vertically: Story -> About Me -> Works) */}
@@ -417,10 +448,10 @@ export const WorldPage: React.FC = () => {
               d="M 36 18 C 42 22, 48 30, 44 34 C 40 38, 56 42, 68 48"
               fill="none"
               stroke="#0f172a"
-              strokeWidth="1.1"
+              strokeWidth="0.7"
               strokeLinecap="round"
-              strokeDasharray="4 3"
-              opacity="0.88"
+              strokeDasharray="3.5 2.5"
+              opacity="0.9"
             />
 
             {/* Storybook Whimsical Dashed Curve: About Me (68, 48) -> My Works (34, 78) */}
@@ -428,16 +459,16 @@ export const WorldPage: React.FC = () => {
               d="M 68 48 C 64 58, 52 58, 56 66 C 60 74, 46 76, 34 78"
               fill="none"
               stroke="#0f172a"
-              strokeWidth="1.1"
+              strokeWidth="0.7"
               strokeLinecap="round"
-              strokeDasharray="4 3"
-              opacity="0.88"
+              strokeDasharray="3.5 2.5"
+              opacity="0.9"
             />
 
             {/* Delicate Waypoint Story Pins */}
-            <circle cx="36" cy="18" r="1.5" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
-            <circle cx="68" cy="48" r="1.5" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
-            <circle cx="34" cy="78" r="1.5" fill="#0f172a" stroke="#ffffff" strokeWidth="0.75" />
+            <circle cx="36" cy="18" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="68" cy="48" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="34" cy="78" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
           </svg>
 
           {/* ══════════════════════════════════════════════════════════════════
@@ -446,6 +477,7 @@ export const WorldPage: React.FC = () => {
               - Mobile: Top-Center
              ══════════════════════════════════════════════════════════════════ */}
           <div
+            ref={storyIslandRef}
             onClick={(e) => handleIslandClick(e, 'story')}
             onMouseEnter={() => {
               setHoveredIsland('story');
@@ -472,7 +504,7 @@ export const WorldPage: React.FC = () => {
             >
               {/* Theme Color Glow from Background (Rose) */}
               <div
-                className={`absolute inset-[-10%] rounded-full bg-rose-500/30 blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute inset-[-10%] rounded-full bg-rose-500/35 blur-2xl pointer-events-none transition-all duration-500 ${
                   hoveredIsland === 'story' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
                 }`}
               />
@@ -484,7 +516,7 @@ export const WorldPage: React.FC = () => {
                   (e.target as HTMLImageElement).src = '/islands/island_story.png';
                 }}
                 alt="The Story Floating Island"
-                className="w-[160px] xs:w-[175px] sm:w-[215px] lg:w-[245px] h-auto object-contain pointer-events-none drop-shadow-[0_16px_28px_rgba(15,23,42,0.65)] select-none"
+                className="w-[160px] xs:w-[175px] sm:w-[215px] lg:w-[280px] xl:w-[310px] h-auto object-contain pointer-events-none drop-shadow-[0_16px_28px_rgba(15,23,42,0.65)] select-none"
               />
 
               {/* Refined Proportional Title Text */}
@@ -507,6 +539,7 @@ export const WorldPage: React.FC = () => {
               - Mobile: Bottom-Left
              ══════════════════════════════════════════════════════════════════ */}
           <div
+            ref={worksIslandRef}
             onClick={(e) => handleIslandClick(e, 'works')}
             onMouseEnter={() => {
               setHoveredIsland('works');
@@ -546,7 +579,7 @@ export const WorldPage: React.FC = () => {
                   (e.target as HTMLImageElement).src = '/islands/island_works.png';
                 }}
                 alt="My Works Floating Island"
-                className="w-[120px] xs:w-[135px] sm:w-[160px] lg:w-[185px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
+                className="w-[120px] xs:w-[135px] sm:w-[160px] lg:w-[210px] xl:w-[235px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
               />
 
               {/* Refined Proportional Title Text (Purple Theme) */}
@@ -569,6 +602,7 @@ export const WorldPage: React.FC = () => {
               - Mobile: Middle-Right
              ══════════════════════════════════════════════════════════════════ */}
           <div
+            ref={aboutIslandRef}
             onClick={(e) => handleIslandClick(e, 'about')}
             onMouseEnter={() => {
               setHoveredIsland('about');
@@ -596,7 +630,7 @@ export const WorldPage: React.FC = () => {
             >
               {/* Theme Color Glow from Background (Cyan) */}
               <div
-                className={`absolute inset-[-10%] rounded-full bg-cyan-400/35 blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute inset-[-10%] rounded-full bg-cyan-400/40 blur-2xl pointer-events-none transition-all duration-500 ${
                   hoveredIsland === 'about' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
                 }`}
               />
@@ -608,7 +642,7 @@ export const WorldPage: React.FC = () => {
                   (e.target as HTMLImageElement).src = '/islands/island_about.png';
                 }}
                 alt="About Me Floating Island"
-                className="w-[125px] xs:w-[140px] sm:w-[165px] lg:w-[190px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
+                className="w-[125px] xs:w-[140px] sm:w-[165px] lg:w-[215px] xl:w-[240px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
               />
 
               {/* Refined Proportional Title Text */}

@@ -83,7 +83,7 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
         <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
-        <span>Worlds</span>
+        <span>Back</span>
       </motion.button>
 
       {/* Track & Flight Path Progress Bar (Center) */}

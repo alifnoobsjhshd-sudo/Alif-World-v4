@@ -1,6 +1,6 @@
 {
-  "name": "Remix Alif-World",
-  "description": "Seamlessly import your GitHub repository and initialize your Google AI Studio project with a single command.",
+  "name": "Alif-World",
+  "description": "Creative developer portfolio of Alif (Zenox). Explore Alif World with interactive 3D sky islands, story chapters, underwater realm, and cosmic works.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

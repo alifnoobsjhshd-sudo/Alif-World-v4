@@ -29,3 +29,38 @@
 .animate-cursor-bubble {
   animation: cursorBubbleFloat 0.85s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
 }
+
+/* ── Mobile Stuck Browser Viewport (Stops whole page rubber-banding / browser scroll) ── */
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+}
+
+/* ── Complete Native Cursor Hiding on Themed Pages (Journey & Space) ── */
+body.hide-native-cursor,
+body.hide-native-cursor *,
+.hide-native-cursor,
+.hide-native-cursor * {
+  cursor: none !important;
+}
+

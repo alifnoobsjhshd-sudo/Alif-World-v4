@@ -38,8 +38,23 @@ export const CustomCursor: React.FC = () => {
   const isAboutMe = path.startsWith('/about');
   const isWorld = path.startsWith('/world');
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
-  const isCosmic = path.startsWith('/explore-work');
+  const isCosmic = path.startsWith('/explore-work') || path.startsWith('/space');
   const isProjects = path.startsWith('/project');
+
+  // Page has zero-delay instant cursor tracking (fully sticky with cursor)
+  const isInstantPage = isJourney || isAboutMe || isCosmic;
+
+  // ── Hide native cursor in Journey and Space pages ──────────────────────
+  useEffect(() => {
+    if (isJourney || isCosmic) {
+      document.body.classList.add('hide-native-cursor');
+    } else {
+      document.body.classList.remove('hide-native-cursor');
+    }
+    return () => {
+      document.body.classList.remove('hide-native-cursor');
+    };
+  }, [isJourney, isCosmic]);
 
   useEffect(() => {
     // Keep custom cursor enabled for desktop and virtual cursor testing on all devices
@@ -141,20 +156,26 @@ export const CustomCursor: React.FC = () => {
       const dx = mousePos.current.x - trailPos.current.x;
       const dy = mousePos.current.y - trailPos.current.y;
 
-      // Smooth lerp factor ~0.18
-      trailPos.current.x += dx * 0.18;
-      trailPos.current.y += dy * 0.18;
-      vel.current.x = dx * 0.18;
-      vel.current.y = dy * 0.18;
-
-      const angle = Math.atan2(vel.current.y, vel.current.x);
+      if (isInstantPage) {
+        // Journey, About Me, Space page: zero delay, fully sticky with cursor
+        trailPos.current.x = mousePos.current.x;
+        trailPos.current.y = mousePos.current.y;
+        vel.current.x = dx;
+        vel.current.y = dy;
+      } else {
+        // Landing, World, Projects: faster circle outline (~0.42 lerp) with slick little delay
+        trailPos.current.x += dx * 0.42;
+        trailPos.current.y += dy * 0.42;
+        vel.current.x = dx * 0.42;
+        vel.current.y = dy * 0.42;
+      }
 
       // Update immediate dot / icon
       if (dotRef.current) {
         dotRef.current.style.transform = `translate3d(${mousePos.current.x}px, ${mousePos.current.y}px, 0) translate(-50%, -50%)`;
       }
 
-      // Update delayed trailing ring
+      // Update trailing ring (instant on journey/about/space, smooth delay on landing/world)
       if (ringRef.current) {
         ringRef.current.style.transform = `translate3d(${trailPos.current.x}px, ${trailPos.current.y}px, 0) translate(-50%, -50%)`;
       }
@@ -191,7 +212,7 @@ export const CustomCursor: React.FC = () => {
       document.removeEventListener('mouseenter', handleMouseEnterWindow);
       document.removeEventListener('mouseleave', handleMouseLeaveWindow);
     };
-  }, [hasMouse, isVisible, isAboutMe, isHovering]);
+  }, [hasMouse, isVisible, isAboutMe, isHovering, isInstantPage]);
 
   // Periodic bubble cleanup
   useEffect(() => {

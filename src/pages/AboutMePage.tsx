@@ -212,7 +212,7 @@ export const AboutMePage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden select-none bg-[#020d1c] font-display text-white">
+    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden select-none bg-[#020d1c] font-display text-white touch-none overscroll-none">
       <SEO
         title="About Me · Alif's Underwater World"
         description="A cinematic, interactive underwater 3D world where visitors explore Alif's story, skills, and passions through a glowing marine fish."

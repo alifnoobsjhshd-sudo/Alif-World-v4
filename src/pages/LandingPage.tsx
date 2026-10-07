@@ -20,7 +20,7 @@ const BG_IMAGE_MOBILE_LOCAL = '/landing-bg-mobile.jpg';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [mobileBgSrc, setMobileBgSrc] = useState(BG_IMAGE_MOBILE_REMOTE);
+  const [mobileBgSrc, setMobileBgSrc] = useState(landingBgMobile || BG_IMAGE_MOBILE_REMOTE);
   const [desktopBgSrc, setDesktopBgSrc] = useState(landingBgUser || BG_IMAGE_DESKTOP_LOCAL);
   const [isZooming, setIsZooming] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -169,7 +169,7 @@ export const LandingPage: React.FC = () => {
     <div
       ref={containerRef}
       onPointerDown={handlePointerDown}
-      className="relative w-screen h-screen overflow-hidden select-none bg-[#14151b] flex items-center justify-center cursor-default"
+      className="relative w-screen h-screen h-[100dvh] overflow-hidden select-none bg-[#14151b] flex items-center justify-center cursor-default touch-none overscroll-none"
       style={{ perspective: '1100px', perspectiveOrigin: '50% 50%' }}
     >
       <SEO
@@ -188,9 +188,8 @@ export const LandingPage: React.FC = () => {
           }}
           alt="Room Atmosphere"
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover scale-125 blur-3xl opacity-70 transform-gpu"
+          className="w-full h-full object-cover scale-125 blur-3xl opacity-75 transform-gpu"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-transparent to-amber-950/25" />
       </div>
 
       {/* ── CINEMATIC ZOOM CONTAINER (Slowly zooms directly into the character bubbles & dream cloud) ── */}
@@ -642,9 +641,9 @@ export const LandingPage: React.FC = () => {
         }}
       />
 
-      {/* ── ACTION BUTTON: Anchored to Right side in Middle Vertically on Desktop, Bottom Center on Mobile ──────── */}
+      {/* ── ACTION BUTTON: Anchored to Right side in Middle Vertically on Desktop, Bottom Center (Lifted up) on Mobile ──────── */}
       <motion.div
-        className="fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 lg:bottom-auto lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:translate-x-0 lg:right-10 xl:right-14 z-30 flex justify-center lg:justify-end items-center bg-transparent pointer-events-auto"
+        className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+3.2rem))] xs:bottom-18 sm:bottom-22 left-1/2 -translate-x-1/2 lg:bottom-auto lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:translate-x-0 lg:right-10 xl:right-14 z-30 flex justify-center lg:justify-end items-center bg-transparent pointer-events-auto"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={
           isZooming

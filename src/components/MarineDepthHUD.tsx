@@ -30,7 +30,7 @@ export const MarineDepthHUD: React.FC<MarineDepthHUDProps> = ({
             className="px-4 py-2 text-xs font-mono tracking-wider uppercase"
           >
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-200" />
-            <span className="font-bold text-white">Worlds</span>
+            <span className="font-bold text-white">Back</span>
           </MagneticShimmerButton>
         </div>
 
