@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
+import { motion } from 'motion/react';
 import { Compass, Sparkles } from 'lucide-react';
 
 export interface LetsDriveButtonProps {
@@ -23,21 +23,6 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   const [spread, setSpread] = useState(24);
   const [isHovered, setIsHovered] = useState(false);
   const [proximityFactor, setProximityFactor] = useState(0.1);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-
-  // Magnetic spring physics for 3D tilt without resizing
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const springConfig = { stiffness: 220, damping: 18, mass: 0.35 };
-  const smoothX = useSpring(mouseX, springConfig);
-  const smoothY = useSpring(mouseY, springConfig);
-  const rotateX = useTransform(smoothY, [-18, 18], [5, -5]);
-  const rotateY = useTransform(smoothX, [-18, 18], [-5, 5]);
-
-  useEffect(() => {
-    const isTouch = 'ontouchstart' in window && window.innerWidth < 1024;
-    setIsTouchDevice(isTouch);
-  }, []);
 
   // ── Global Mouse/Cursor Tracker: Nearest side lights up at all distances ──
   const handleGlobalPointerMove = useCallback((e: MouseEvent | PointerEvent) => {
@@ -102,22 +87,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     };
   }, [handleGlobalPointerMove]);
 
-  // Subtle 3D magnetic tilt tracking (no button size change)
-  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (isTouchDevice) return;
-    const button = buttonRef.current;
-    if (!button) return;
-
-    const rect = button.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const diffX = e.clientX - (rect.left + centerX);
-    const diffY = e.clientY - (rect.top + centerY);
-    mouseX.set(Math.max(-16, Math.min(16, diffX * 0.25)));
-    mouseY.set(Math.max(-16, Math.min(16, diffY * 0.25)));
-  };
-
+  // Subtle magnetic hover state (button position and size remain strictly locked)
   const handlePointerEnter = () => {
     setIsHovered(true);
     setSpread(360);
@@ -126,8 +96,6 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   };
 
   const handlePointerLeave = () => {
-    mouseX.set(0);
-    mouseY.set(0);
     if (onMouseLeave) onMouseLeave();
   };
 
@@ -145,7 +113,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative inline-flex items-center justify-center p-[2.5px] rounded-2xl sm:rounded-3xl select-none group transition-shadow duration-200 ${className}`}
+      className={`relative inline-flex items-center justify-center p-[2.5px] rounded-2xl sm:rounded-3xl select-none group transition-shadow duration-200 pointer-events-auto ${className}`}
       style={{
         background: outlineGradient,
       }}
@@ -159,22 +127,17 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
         }}
       />
 
-      {/* ── 2. BUTTON BODY: FIXED STABLE SIZE (NO SIZE CHANGE IN ANY ANIMATION) ── */}
+      {/* ── 2. BUTTON BODY: FIXED STABLE SIZE & POSITION (NO POSITION OR SIZE CHANGE IN ANY ANIMATION) ── */}
       <motion.button
         ref={buttonRef}
         type="button"
         onClick={onClick}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
-        onPointerMove={handlePointerMove}
         title="LET'S DRIVE · Enter Alif's World"
         aria-label="LET'S DRIVE"
         style={{
-          x: isTouchDevice ? 0 : smoothX,
-          y: isTouchDevice ? 0 : smoothY,
-          rotateX: isTouchDevice ? 0 : rotateX,
-          rotateY: isTouchDevice ? 0 : rotateY,
-          transformStyle: 'preserve-3d',
+          transform: 'none',
         }}
         whileTap={{ scale: 1 }}
         whileHover={{ scale: 1 }}

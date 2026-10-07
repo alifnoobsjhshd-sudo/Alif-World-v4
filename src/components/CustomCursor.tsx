@@ -315,12 +315,13 @@ export const CustomCursor: React.FC = () => {
         className="fixed top-0 left-0 pointer-events-none will-change-transform z-10 flex items-center justify-center"
         style={{ transform: 'translate3d(-100px, -100px, 0)' }}
       >
-        {/* 3A. JOURNEY PAGE: PAPER AIRPLANE CURSOR ICON */}
+        {/* 3A. JOURNEY PAGE: PAPER AIRPLANE CURSOR ICON (Facing from right to left like default cursor) */}
         {isJourney ? (
           <div
-            className={`transition-transform duration-200 ${
-              isClicking ? 'scale-90 rotate-[-12deg]' : isHovering ? 'scale-125' : 'scale-100'
+            className={`transition-transform duration-200 translate-x-[10px] translate-y-[10px] ${
+              isClicking ? 'scale-90 rotate-[10deg]' : isHovering ? 'scale-125' : 'scale-100'
             }`}
+            style={{ transformOrigin: '2px 2px' }}
           >
             <svg
               width="24"
@@ -329,15 +330,17 @@ export const CustomCursor: React.FC = () => {
               fill="none"
               className="drop-shadow-[0_2px_8px_rgba(14,165,233,0.7)]"
             >
+              {/* Airplane body facing top-left (from right to left like default pointer) */}
               <path
-                d="M 2 12 L 22 2 L 12 22 L 10 14 L 2 12 Z"
+                d="M 22 12 L 2 2 L 12 22 L 14 14 Z"
                 fill="#ffffff"
                 stroke="#38bdf8"
                 strokeWidth="1.5"
                 strokeLinejoin="round"
               />
+              {/* Central crease from tip (2, 2) to tail fold (14, 14) */}
               <path
-                d="M 22 2 L 10 14"
+                d="M 2 2 L 14 14"
                 stroke="#0284c7"
                 strokeWidth="1.2"
                 strokeLinecap="round"
@@ -345,11 +348,12 @@ export const CustomCursor: React.FC = () => {
             </svg>
           </div>
         ) : isCosmic ? (
-          /* 3B. SPACE / COSMIC PAGE: ROCKET CURSOR ICON */
+          /* 3B. SPACE / COSMIC PAGE: ROCKET CURSOR ICON (Facing from right to left like default cursor) */
           <div
-            className={`transition-transform duration-200 ${
-              isClicking ? 'scale-90' : isHovering ? 'scale-125' : 'scale-100'
+            className={`transition-transform duration-200 translate-x-[8px] translate-y-[8px] ${
+              isClicking ? 'scale-90 rotate-[-8deg]' : isHovering ? 'scale-125' : 'scale-100'
             }`}
+            style={{ transformOrigin: '5px 5px' }}
           >
             <svg
               width="26"

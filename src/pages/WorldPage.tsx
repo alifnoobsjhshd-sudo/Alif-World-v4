@@ -324,8 +324,8 @@ export const WorldPage: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* ── TOP NAVIGATION BAR (Simplified: "Back" & Sound Only) ─────────────── */}
-      <header className="relative z-40 flex items-center justify-between px-4 sm:px-8 pt-3 sm:pt-4 pb-2 pointer-events-none w-full">
+      {/* ── TOP NAVIGATION BAR (Transparent Overlay: "Back" & Sound Only) ─────────────── */}
+      <header className="absolute top-0 inset-x-0 z-40 flex items-center justify-between px-4 sm:px-8 pt-3 sm:pt-4 pb-2 pointer-events-none w-full bg-transparent">
         {/* Left: "Back" Button (Magnetic Shimmer Stroke) */}
         <div className="pointer-events-auto">
           <MagneticShimmerButton
@@ -366,9 +366,9 @@ export const WorldPage: React.FC = () => {
         </div>
       </header>
 
-      {/* ── CENTER: 3 SEPARATE FLOATING ISLANDS CONNECTED BY BLACK LINES ───── */}
+      {/* ── CENTER: 3 SEPARATE FLOATING ISLANDS (LIFTED VERTICALLY FOR CLEAN PROFESSIONAL VIBE) ───── */}
       <main
-        className="relative flex-1 w-full flex items-center justify-center p-2 sm:p-4 overflow-hidden z-20"
+        className="relative flex-1 w-full h-full flex items-center justify-center p-2 sm:p-4 overflow-visible z-20"
         style={{ perspective: isDesktop ? '1200px' : 'none' }}
       >
         <motion.div
@@ -400,52 +400,17 @@ export const WorldPage: React.FC = () => {
                   duration: 0.3,
                 }
           }
-          className="relative w-full max-w-4xl lg:max-w-6xl h-[72vh] min-h-[500px] max-h-[700px] flex items-center justify-center will-change-transform pointer-events-auto"
+          className="relative w-full max-w-4xl lg:max-w-6xl h-[72vh] min-h-[500px] max-h-[700px] flex items-center justify-center will-change-transform pointer-events-auto -translate-y-5 lg:-translate-y-7 xl:-translate-y-9"
         >
-          {/* ── CARTOONIST STORYBOOK ADVENTURE TRAIL (Thin, Playful Curves, Pure Black, No Background) ── */}
-          {/* Desktop Connecting Paths (Visualizing a progressive path like mobile: Story -> About Me -> My Works) */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none z-10 hidden lg:block overflow-visible"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            {/* Storybook Whimsical Dashed Curve 1: The Story (50, 20) -> About Me (86, 68) */}
-            <path
-              d="M 50 20 C 58 24, 72 32, 70 42 C 68 52, 78 56, 86 68"
-              fill="none"
-              stroke="#0f172a"
-              strokeWidth="0.75"
-              strokeLinecap="round"
-              strokeDasharray="3.5 3"
-              opacity="0.9"
-            />
-
-            {/* Storybook Whimsical Dashed Curve 2: About Me (86, 68) -> My Works (14, 68) */}
-            <path
-              d="M 86 68 C 74 78, 62 60, 50 72 C 38 84, 26 58, 14 68"
-              fill="none"
-              stroke="#0f172a"
-              strokeWidth="0.75"
-              strokeLinecap="round"
-              strokeDasharray="3.5 3"
-              opacity="0.9"
-            />
-
-            {/* Delicate Waypoint Story Pins */}
-            <circle cx="50" cy="20" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="86" cy="68" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="14" cy="68" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-          </svg>
-
-          {/* Mobile Connecting Paths (Vertically: Story -> About Me -> Works) */}
+          {/* Mobile Connecting Paths Only (Desktop Black Lines Removed As Requested) */}
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none z-10 lg:hidden overflow-visible"
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
           >
-            {/* Storybook Whimsical Dashed Curve: The Story (36, 18) -> About Me (68, 48) */}
+            {/* Storybook Whimsical Dashed Curve: The Story (36, 17) -> About Me (68, 44) */}
             <path
-              d="M 36 18 C 42 22, 48 30, 44 34 C 40 38, 56 42, 68 48"
+              d="M 36 17 C 42 21, 48 29, 44 33 C 40 37, 56 40, 68 44"
               fill="none"
               stroke="#0f172a"
               strokeWidth="0.7"
@@ -454,9 +419,9 @@ export const WorldPage: React.FC = () => {
               opacity="0.9"
             />
 
-            {/* Storybook Whimsical Dashed Curve: About Me (68, 48) -> My Works (34, 78) */}
+            {/* Storybook Whimsical Dashed Curve: About Me (68, 44) -> My Works (34, 74) */}
             <path
-              d="M 68 48 C 64 58, 52 58, 56 66 C 60 74, 46 76, 34 78"
+              d="M 68 44 C 64 54, 52 54, 56 62 C 60 70, 46 72, 34 74"
               fill="none"
               stroke="#0f172a"
               strokeWidth="0.7"
@@ -466,15 +431,15 @@ export const WorldPage: React.FC = () => {
             />
 
             {/* Delicate Waypoint Story Pins */}
-            <circle cx="36" cy="18" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="68" cy="48" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="34" cy="78" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="36" cy="17" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="68" cy="44" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
+            <circle cx="34" cy="74" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
           </svg>
 
           {/* ══════════════════════════════════════════════════════════════════
               ISLAND 1: "THE STORY" (GRAND HERO ISLAND - PROMINENT & BIGGER)
-              - Desktop: Top-Center
-              - Mobile: Top-Center
+              - Desktop: Top-Center (Lifted up)
+              - Mobile: Top-Center (Lifted up)
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={storyIslandRef}
@@ -484,7 +449,7 @@ export const WorldPage: React.FC = () => {
               dreamAudio.playHover();
             }}
             onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute top-[2%] left-[36%] -translate-x-1/2 lg:top-[4%] lg:left-[50%] lg:-translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
+            className="absolute top-[0%] left-[36%] -translate-x-1/2 lg:top-[2%] lg:left-[50%] lg:-translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
             title="The Story · Click to Explore"
           >
             {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
@@ -502,9 +467,9 @@ export const WorldPage: React.FC = () => {
               whileTap={{ scale: 0.96 }}
               className="relative flex flex-col items-center"
             >
-              {/* Theme Color Glow from Background (Rose) */}
+              {/* Theme Color Glow from Background (Rose) - Diffuses smoothly with zero clipping */}
               <div
-                className={`absolute inset-[-10%] rounded-full bg-rose-500/35 blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute inset-[-15%] rounded-full bg-rose-500/35 blur-3xl pointer-events-none transition-all duration-500 ${
                   hoveredIsland === 'story' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
                 }`}
               />
@@ -535,8 +500,8 @@ export const WorldPage: React.FC = () => {
 
           {/* ══════════════════════════════════════════════════════════════════
               ISLAND 2: "MY WORKS" (Purple Theme)
-              - Desktop: Bottom-Left (Balanced distance with Story and About Me)
-              - Mobile: Bottom-Left
+              - Desktop: Bottom-Left (Lifted up for balanced professional spacing)
+              - Mobile: Bottom-Left (Lifted up)
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={worksIslandRef}
@@ -546,7 +511,7 @@ export const WorldPage: React.FC = () => {
               dreamAudio.playHover();
             }}
             onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute bottom-[4%] left-[6%] lg:bottom-[8%] lg:left-[4%] lg:top-auto lg:right-auto z-20 cursor-pointer group flex flex-col items-center select-none"
+            className="absolute bottom-[8%] left-[6%] lg:bottom-[15%] lg:left-[4%] lg:top-auto lg:right-auto z-20 cursor-pointer group flex flex-col items-center select-none"
             title="My Works · Click to Explore"
           >
             {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
@@ -567,7 +532,7 @@ export const WorldPage: React.FC = () => {
             >
               {/* Theme Color Glow from Background (Purple) */}
               <div
-                className={`absolute inset-[-10%] rounded-full bg-purple-600/40 blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute inset-[-12%] rounded-full bg-purple-600/40 blur-2xl pointer-events-none transition-all duration-500 ${
                   hoveredIsland === 'works' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
                 }`}
               />
@@ -598,8 +563,8 @@ export const WorldPage: React.FC = () => {
 
           {/* ══════════════════════════════════════════════════════════════════
               ISLAND 3: "ABOUT ME" / "MORE ABOUT HIM"
-              - Desktop: Bottom-Right (Balanced distance with Story and My Works)
-              - Mobile: Middle-Right
+              - Desktop: Bottom-Right (Lifted up for balanced professional spacing)
+              - Mobile: Middle-Right (Lifted up)
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={aboutIslandRef}
@@ -609,7 +574,7 @@ export const WorldPage: React.FC = () => {
               dreamAudio.playHover();
             }}
             onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute top-[36%] right-[6%] lg:top-auto lg:bottom-[8%] lg:right-[4%] lg:left-auto z-20 cursor-pointer group flex flex-col items-center select-none"
+            className="absolute top-[32%] right-[6%] lg:top-auto lg:bottom-[15%] lg:right-[4%] lg:left-auto z-20 cursor-pointer group flex flex-col items-center select-none"
             title="More About Him · Click to Explore"
           >
             {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
@@ -630,7 +595,7 @@ export const WorldPage: React.FC = () => {
             >
               {/* Theme Color Glow from Background (Cyan) */}
               <div
-                className={`absolute inset-[-10%] rounded-full bg-cyan-400/40 blur-2xl pointer-events-none transition-all duration-500 ${
+                className={`absolute inset-[-12%] rounded-full bg-cyan-400/40 blur-2xl pointer-events-none transition-all duration-500 ${
                   hoveredIsland === 'about' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
                 }`}
               />
