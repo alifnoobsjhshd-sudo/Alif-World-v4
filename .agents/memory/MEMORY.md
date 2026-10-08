@@ -1,0 +1,1 @@
+- [External deployment lockfiles](external-deployment-lockfiles.md) — Keep Replit-only firewall tarball URLs out of locks used by Render or other external builders.
