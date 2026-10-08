@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Compass, Volume2, VolumeX, Mail } from 'lucide-react';
@@ -8,6 +8,7 @@ import { CartoonCloudTransition } from '../components/CartoonCloudTransition';
 import { StoryContactModal } from '../components/StoryContactModal';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { LetsDriveButton } from '../components/LetsDriveButton';
+import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
 import { CursorBackgroundBlurLens } from '../components/CursorBackgroundBlurLens';
 import landingBgUser from '../assets/images/landing_bg_user.jpg';
 import landingBgMobile from '../assets/images/landing_bg_mobile.jpg';
@@ -23,6 +24,7 @@ export const LandingPage: React.FC = () => {
   const [mobileBgSrc, setMobileBgSrc] = useState(landingBgMobile || BG_IMAGE_MOBILE_REMOTE);
   const [desktopBgSrc, setDesktopBgSrc] = useState(landingBgUser || BG_IMAGE_DESKTOP_LOCAL);
   const [isZooming, setIsZooming] = useState(false);
+  const [isCutscenePlaying, setIsCutscenePlaying] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isHoveringStory, setIsHoveringStory] = useState(false);
@@ -111,16 +113,6 @@ export const LandingPage: React.FC = () => {
     };
   }, []);
 
-  const storyTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (storyTimerRef.current) {
-        clearTimeout(storyTimerRef.current);
-      }
-    };
-  }, []);
-
   const handleStartStory = () => {
     if (isZooming) return;
     setIsZooming(true);
@@ -131,12 +123,16 @@ export const LandingPage: React.FC = () => {
     dreamAudio.startJourneyMusic();
     dreamAudio.setStoryScene(0);
 
-    // Fallback safety timeout if transition completes or drops
-    if (storyTimerRef.current) clearTimeout(storyTimerRef.current);
-    storyTimerRef.current = setTimeout(() => {
-      navigate('/world');
-    }, 4800);
   };
+
+  const handleDreamTransitionComplete = useCallback(() => {
+    if (window.innerWidth >= 1024) {
+      dreamAudio.stopJourneyMusic(0.4);
+      setIsCutscenePlaying(true);
+      return;
+    }
+    navigate('/world');
+  }, [navigate]);
 
   const toggleAudio = () => {
     const next = dreamAudio.toggleMute();
@@ -579,10 +575,12 @@ export const LandingPage: React.FC = () => {
       {/* ── CARTOON CLOUD TRANSITION (Billows out when entering dream realm) ── */}
       <CartoonCloudTransition 
         isActive={isZooming} 
-        onComplete={() => {
-          if (storyTimerRef.current) clearTimeout(storyTimerRef.current);
-          navigate('/world');
-        }} 
+        onComplete={handleDreamTransitionComplete}
+      />
+      <CinematicVideoCutscene
+        isActive={isCutscenePlaying}
+        videoSrc="/intro-cutscene.mp4"
+        onComplete={() => navigate('/world')}
       />
 
       {/* ── TOP LEFT CONTACT MENU BUTTON (Magnetic Shimmer Stroke) ─────────── */}
