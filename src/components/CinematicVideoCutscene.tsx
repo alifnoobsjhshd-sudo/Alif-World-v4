@@ -7,7 +7,11 @@ interface CinematicVideoCutsceneProps {
   videoSrc: string;
 }
 
-const BAR_HEIGHT = 'clamp(3.75rem, 8vh, 7rem)';
+type PlaybackIssue = 'blocked' | 'stalled' | 'error';
+
+const STARTUP_TIMEOUT_MS = 12_000;
+const STALL_TIMEOUT_MS = 8_000;
+const PLAYBACK_FAILSAFE_MS = 30_000;
 
 export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   isActive,
@@ -18,57 +22,128 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const activeRef = useRef(isActive);
-  const [isMuted, setIsMuted] = useState(false);
-  const [playbackBlocked, setPlaybackBlocked] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const timersRef = useRef<{ startup?: number; stall?: number; failsafe?: number }>({});
+  const [playbackIssue, setPlaybackIssue] = useState<PlaybackIssue | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
   onCompleteRef.current = onComplete;
   activeRef.current = isActive;
 
+  const clearPlaybackTimers = useCallback(() => {
+    const { startup, stall, failsafe } = timersRef.current;
+    [startup, stall, failsafe].forEach((timer) => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    });
+    timersRef.current = {};
+  }, []);
+
   const complete = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
+    clearPlaybackTimers();
     videoRef.current?.pause();
     onCompleteRef.current();
-  }, []);
+  }, [clearPlaybackTimers]);
 
   useEffect(() => {
     if (!isActive) {
       completedRef.current = false;
-      setPlaybackBlocked(false);
-      setProgress(0);
+      setPlaybackIssue(null);
+      clearPlaybackTimers();
       return;
     }
 
     completedRef.current = false;
-    setPlaybackBlocked(false);
-    setProgress(0);
+    setPlaybackIssue(null);
+    clearPlaybackTimers();
+
     const video = videoRef.current;
     if (!video) return;
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     video.muted = false;
-    setIsMuted(false);
+    video.preload = 'auto';
+
+    const scheduleFailsafe = (delay: number) => {
+      if (timersRef.current.failsafe !== undefined) {
+        window.clearTimeout(timersRef.current.failsafe);
+      }
+      timersRef.current.failsafe = window.setTimeout(complete, delay);
+    };
+
+    const handlePlaying = () => {
+      if (timersRef.current.startup !== undefined) {
+        window.clearTimeout(timersRef.current.startup);
+        timersRef.current.startup = undefined;
+      }
+      if (timersRef.current.stall !== undefined) {
+        window.clearTimeout(timersRef.current.stall);
+        timersRef.current.stall = undefined;
+      }
+      setPlaybackIssue(null);
+    };
+
+    const handleWaiting = () => {
+      if (timersRef.current.stall !== undefined) {
+        window.clearTimeout(timersRef.current.stall);
+      }
+      timersRef.current.stall = window.setTimeout(() => {
+        if (activeRef.current && !completedRef.current) setPlaybackIssue('stalled');
+      }, STALL_TIMEOUT_MS);
+    };
+
+    const handleError = () => setPlaybackIssue('error');
+    const handleMetadata = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        scheduleFailsafe(Math.max(PLAYBACK_FAILSAFE_MS, video.duration * 1000 + 20_000));
+      }
+    };
 
     const playWithMutedFallback = async () => {
+      if (!activeRef.current || completedRef.current) return;
       try {
         await video.play();
       } catch {
         if (!activeRef.current || completedRef.current) return;
-
         video.muted = true;
-        setIsMuted(true);
         try {
           await video.play();
         } catch {
-          if (activeRef.current && !completedRef.current) setPlaybackBlocked(true);
+          if (activeRef.current && !completedRef.current) setPlaybackIssue('blocked');
         }
       }
     };
 
-    void playWithMutedFallback();
-    return () => video.pause();
-  }, [isActive, videoSrc]);
+    const handleCanPlay = () => void playWithMutedFallback();
+
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('error', handleError);
+    video.addEventListener('loadedmetadata', handleMetadata);
+    scheduleFailsafe(PLAYBACK_FAILSAFE_MS);
+    timersRef.current.startup = window.setTimeout(() => {
+      if (video.paused && !video.ended) setPlaybackIssue('blocked');
+    }, STARTUP_TIMEOUT_MS);
+
+    if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+      handleCanPlay();
+    } else {
+      video.addEventListener('canplay', handleCanPlay, { once: true });
+      video.load();
+    }
+
+    return () => {
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('loadedmetadata', handleMetadata);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.pause();
+      clearPlaybackTimers();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [clearPlaybackTimers, complete, isActive, videoSrc]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -81,169 +156,81 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [complete, isActive]);
 
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const nextMuted = !video.muted;
-    video.muted = nextMuted;
-    setIsMuted(nextMuted);
-  };
-
   const retryPlayback = async () => {
     const video = videoRef.current;
     if (!video) return;
+
+    setPlaybackIssue(null);
     try {
+      if (video.error) video.load();
+      video.muted = false;
       await video.play();
-      setPlaybackBlocked(false);
     } catch {
-      setPlaybackBlocked(true);
+      try {
+        video.muted = true;
+        await video.play();
+      } catch {
+        setPlaybackIssue('blocked');
+      }
     }
   };
 
   if (!isActive) return null;
 
-  const transition = prefersReducedMotion
-    ? { duration: 0 }
-    : { duration: 1.25, ease: [0.76, 0, 0.24, 1] as [number, number, number, number] };
-
   return (
     <motion.div
-      className="fixed inset-0 z-[130] overflow-hidden bg-[#08090b] text-[#eee9df]"
+      className="fixed inset-0 z-[130] h-screen w-screen overflow-hidden bg-black"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.45 }}
+      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2 }}
       role="dialog"
       aria-modal="true"
       aria-label="Alif's portfolio film"
+      style={{ height: '100dvh', width: '100vw' }}
     >
-      <motion.div
-        className="absolute inset-x-0 bg-black"
-        style={{ top: 0, height: BAR_HEIGHT, transformOrigin: 'top' }}
-        initial={{ scaleY: 0 }}
-        animate={{ scaleY: 1 }}
-        transition={transition}
-        aria-hidden="true"
-      />
-      <motion.div
-        className="absolute inset-x-0 bg-black"
-        style={{ bottom: 0, height: BAR_HEIGHT, transformOrigin: 'bottom' }}
-        initial={{ scaleY: 0 }}
-        animate={{ scaleY: 1 }}
-        transition={transition}
-        aria-hidden="true"
+      <video
+        ref={videoRef}
+        src={videoSrc}
+        playsInline
+        preload="auto"
+        controls={false}
+        disablePictureInPicture
+        disableRemotePlayback
+        onEnded={complete}
+        className="absolute inset-0 h-full w-full bg-black object-cover"
+        aria-label="Portfolio introduction film"
       />
 
-      <motion.div
-        className="absolute inset-x-0 z-10"
-        initial={{ top: 0, bottom: 0 }}
-        animate={{ top: BAR_HEIGHT, bottom: BAR_HEIGHT }}
-        transition={transition}
-      >
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          autoPlay
-          playsInline
-          preload="auto"
-          onEnded={complete}
-          onTimeUpdate={(event) => {
-            const video = event.currentTarget;
-            if (Number.isFinite(video.duration) && video.duration > 0) {
-              setProgress(video.currentTime / video.duration);
-            }
-          }}
-          onError={() => setPlaybackBlocked(true)}
-          className="h-full w-full bg-[#08090b] object-contain"
-          aria-label="Portfolio introduction film"
-        />
-      </motion.div>
-
-      <motion.header
-        className="absolute inset-x-0 top-0 z-20 flex h-[clamp(3.75rem,8vh,7rem)] items-center justify-between px-5 sm:px-8 lg:px-12"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.6, delay: 0.45 }}
-      >
-        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.28em] text-[#e9e2d5]/90 sm:text-xs">
-          Alif <span className="mx-2 text-[#b49c76]/70">/</span> Portfolio film
-        </span>
-        <span className="hidden font-mono text-[9px] uppercase tracking-[0.24em] text-[#e9e2d5]/45 sm:block">
-          A world unfolding
-        </span>
-      </motion.header>
-
-      <motion.footer
-        className="absolute inset-x-0 bottom-0 z-20 flex h-[clamp(3.75rem,8vh,7rem)] items-center gap-5 px-5 sm:px-8 lg:px-12"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.6, delay: 0.55 }}
-      >
-        <div className="hidden min-w-24 font-mono text-[9px] uppercase tracking-[0.2em] text-[#e9e2d5]/45 sm:block">
-          Introduction
-        </div>
+      {playbackIssue && (
         <div
-          className="h-px flex-1 overflow-hidden bg-[#eee9df]/20"
-          role="progressbar"
-          aria-label="Film progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progress * 100)}
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 px-6 text-center text-white"
+          role="alert"
         >
-          <div
-            className="h-full origin-left bg-[#c6aa7e]"
-            style={{ transform: `scaleX(${progress})` }}
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-4 sm:gap-6">
-          <button
-            type="button"
-            onClick={toggleMute}
-            className="inline-flex min-h-11 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#eee9df]/75 transition-colors hover:text-[#fff] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-[#c6aa7e]"
-            aria-label={isMuted ? 'Unmute film' : 'Mute film'}
-            aria-pressed={isMuted}
-          >
-            {isMuted ? (
-              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                <path d="M9 4 5.5 7H3v6h2.5L9 16V4Z" stroke="currentColor" strokeWidth="1.3" />
-                <path d="m13 7 4 6m0-6-4 6" stroke="currentColor" strokeWidth="1.3" />
-              </svg>
-            ) : (
-              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
-                <path d="M9 4 5.5 7H3v6h2.5L9 16V4Z" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M12 7.5a3.5 3.5 0 0 1 0 5m2-7a6.5 6.5 0 0 1 0 9" stroke="currentColor" strokeWidth="1.3" />
-              </svg>
-            )}
-            <span className="hidden sm:inline">{isMuted ? 'Sound off' : 'Sound on'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={complete}
-            className="group inline-flex min-h-11 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#eee9df]/90 transition-colors hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-[#c6aa7e]"
-            aria-label="Skip introduction film"
-          >
-            Skip
-            <span aria-hidden="true" className="text-[#c6aa7e] transition-transform group-hover:translate-x-1">
-              →
-            </span>
-          </button>
-        </div>
-      </motion.footer>
-
-      {playbackBlocked && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#08090b]/75 px-6 text-center backdrop-blur-sm">
-          <div className="max-w-sm">
-            <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-[#c6aa7e]">
-              The film is ready
+          <div>
+            <p className="font-mono text-sm uppercase tracking-[0.16em]">
+              {playbackIssue === 'stalled'
+                ? 'The film is taking longer than expected'
+                : playbackIssue === 'error'
+                  ? 'The film could not be loaded'
+                  : 'The film could not start automatically'}
             </p>
-            <p className="mt-3 font-serif text-2xl text-[#eee9df]">Begin when you are.</p>
-            <button
-              type="button"
-              onClick={retryPlayback}
-              className="mt-6 min-h-11 border border-[#eee9df]/35 px-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#eee9df] transition-colors hover:border-[#c6aa7e] hover:text-[#d9c29a] focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-[#c6aa7e]"
-            >
-              Play film
-            </button>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={retryPlayback}
+                className="min-h-11 border border-white/70 px-5 font-mono text-xs uppercase tracking-wider hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={complete}
+                className="min-h-11 border border-white/30 px-5 font-mono text-xs uppercase tracking-wider hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Continue to Worlds
+              </button>
+            </div>
           </div>
         </div>
       )}
