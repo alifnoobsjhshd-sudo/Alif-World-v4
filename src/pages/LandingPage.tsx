@@ -579,6 +579,7 @@ export const LandingPage: React.FC = () => {
       />
       <CinematicVideoCutscene
         isActive={isCutscenePlaying}
+        shouldPreload={isDesktop && isZooming}
         videoSrc="/intro-cutscene.mp4"
         onComplete={() => navigate('/world')}
       />
@@ -641,7 +642,18 @@ export const LandingPage: React.FC = () => {
 
       {/* ── ACTION BUTTON: Anchored to Right side in Middle Vertically on Desktop, Bottom Center (Lifted up) on Mobile ──────── */}
       <motion.div
-        className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+3.2rem))] xs:bottom-18 sm:bottom-22 left-1/2 -translate-x-1/2 lg:bottom-auto lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:translate-x-0 lg:right-10 xl:right-14 z-30 flex justify-center lg:justify-end items-center bg-transparent pointer-events-auto"
+        className="fixed bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+3.2rem))] xs:bottom-18 sm:bottom-22 left-1/2 -translate-x-1/2 z-30 flex justify-center items-center bg-transparent pointer-events-auto"
+        style={
+          isDesktop
+            ? {
+                top: '50%',
+                right: 'clamp(2rem, 4vw, 3.5rem)',
+                bottom: 'auto',
+                left: 'auto',
+                translate: '0 -50%',
+              }
+            : undefined
+        }
         initial={{ opacity: 0, scale: 0.95 }}
         animate={
           isZooming

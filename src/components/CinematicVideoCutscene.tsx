@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'motion/react';
 interface CinematicVideoCutsceneProps {
   isActive: boolean;
   onComplete: () => void;
+  shouldPreload: boolean;
   videoSrc: string;
 }
 
@@ -16,6 +17,7 @@ const PLAYBACK_FAILSAFE_MS = 30_000;
 export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   isActive,
   onComplete,
+  shouldPreload,
   videoSrc,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -130,7 +132,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       handleCanPlay();
     } else {
       video.addEventListener('canplay', handleCanPlay, { once: true });
-      video.load();
+      if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) video.load();
     }
 
     return () => {
@@ -175,34 +177,46 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     }
   };
 
-  if (!isActive) return null;
+  if (!isActive && !shouldPreload) return null;
 
   return (
     <motion.div
-      className="fixed inset-0 z-[130] h-screen w-screen overflow-hidden bg-black"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      className={
+        isActive
+          ? 'fixed inset-0 z-[130] h-screen w-screen overflow-hidden bg-black'
+          : 'pointer-events-none fixed left-0 top-0 z-[-1] h-px w-px overflow-hidden opacity-0'
+      }
+      initial={false}
+      animate={{ opacity: isActive ? 1 : 0 }}
       exit={{ opacity: 0 }}
       transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2 }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Alif's portfolio film"
-      style={{ height: '100dvh', width: '100vw' }}
+      role={isActive ? 'dialog' : undefined}
+      aria-modal={isActive || undefined}
+      aria-hidden={!isActive}
+      aria-label={isActive ? "Alif's portfolio film" : undefined}
+      style={{
+        height: isActive ? '100dvh' : '1px',
+        width: isActive ? '100vw' : '1px',
+      }}
     >
       <video
         ref={videoRef}
         src={videoSrc}
         playsInline
-        preload="auto"
+        preload={isActive || shouldPreload ? 'auto' : 'none'}
         controls={false}
         disablePictureInPicture
         disableRemotePlayback
         onEnded={complete}
-        className="absolute inset-0 h-full w-full bg-black object-cover"
+        className={
+          isActive
+            ? 'absolute inset-0 h-full w-full bg-black object-cover'
+            : 'absolute inset-0 h-px w-px object-cover'
+        }
         aria-label="Portfolio introduction film"
       />
 
-      {playbackIssue && (
+      {isActive && playbackIssue && (
         <div
           className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 px-6 text-center text-white"
           role="alert"
