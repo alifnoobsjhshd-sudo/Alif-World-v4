@@ -155,26 +155,42 @@ export const WorldPage: React.FC = () => {
   };
 
   // Island Click: Zooms into the clicked island then triggers the dedicated transition
-  const handleIslandClick = (
-    e: React.MouseEvent,
-    islandId: 'story' | 'about' | 'works'
-  ) => {
+  const handleIslandClick = (islandId: 'story' | 'about' | 'works') => {
     if (zoomingIsland || activeTransition) return;
     dreamAudio.playDreamRipple();
 
-    // Compute exact click coordinates within the cluster to zoom directly into that point
-    if (clusterRef.current) {
-      const rect = clusterRef.current.getBoundingClientRect();
-      const xPct = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
-      const yPct = Math.max(5, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100));
-      setZoomOrigin(`${xPct.toFixed(1)}% ${yPct.toFixed(1)}%`);
-    } else {
-      const islandOrigins: Record<string, string> = {
-        story: '50% 20%',
-        about: isDesktop ? '86% 68%' : '78% 68%',
-        works: isDesktop ? '14% 68%' : '22% 68%',
+    // Anchor the camera on the selected island's center, not the exact point
+    // within its artwork or label where the pointer happened to land.
+    const cluster = clusterRef.current;
+    const islandRef = {
+      story: storyIslandRef,
+      about: aboutIslandRef,
+      works: worksIslandRef,
+    }[islandId];
+    const island = islandRef.current;
+
+    if (cluster && island && cluster.clientWidth > 0 && cluster.clientHeight > 0) {
+      const [translateX = '0px', translateY = '0px'] = window
+        .getComputedStyle(island)
+        .getPropertyValue('translate')
+        .trim()
+        .split(/\s+/);
+      const translateToPixels = (value: string, size: number) => {
+        const amount = Number.parseFloat(value);
+        if (!Number.isFinite(amount)) return 0;
+        return value.endsWith('%') ? (amount / 100) * size : amount;
       };
-      setZoomOrigin(islandOrigins[islandId] || '50% 50%');
+      const centerX =
+        island.offsetLeft +
+        island.offsetWidth / 2 +
+        translateToPixels(translateX, island.offsetWidth);
+      const centerY =
+        island.offsetTop +
+        island.offsetHeight / 2 +
+        translateToPixels(translateY, island.offsetHeight);
+      const xPct = Math.max(0, Math.min(100, (centerX / cluster.clientWidth) * 100));
+      const yPct = Math.max(0, Math.min(100, (centerY / cluster.clientHeight) * 100));
+      setZoomOrigin(`${xPct.toFixed(1)}% ${yPct.toFixed(1)}%`);
     }
 
     setZoomingIsland(islandId);
@@ -443,7 +459,7 @@ export const WorldPage: React.FC = () => {
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={storyIslandRef}
-            onClick={(e) => handleIslandClick(e, 'story')}
+            onClick={() => handleIslandClick('story')}
             onMouseEnter={() => {
               setHoveredIsland('story');
               dreamAudio.playHover();
@@ -505,7 +521,7 @@ export const WorldPage: React.FC = () => {
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={worksIslandRef}
-            onClick={(e) => handleIslandClick(e, 'works')}
+            onClick={() => handleIslandClick('works')}
             onMouseEnter={() => {
               setHoveredIsland('works');
               dreamAudio.playHover();
@@ -568,7 +584,7 @@ export const WorldPage: React.FC = () => {
              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={aboutIslandRef}
-            onClick={(e) => handleIslandClick(e, 'about')}
+            onClick={() => handleIslandClick('about')}
             onMouseEnter={() => {
               setHoveredIsland('about');
               dreamAudio.playHover();

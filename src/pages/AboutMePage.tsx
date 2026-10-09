@@ -73,11 +73,11 @@ export const AboutMePage: React.FC = () => {
   useEffect(() => {
     // Explicitly guarantee no World Page sky music or space music is playing
     dreamAudio.stopAllNonUnderwaterMusic();
-    dreamAudio.startUnderwaterAmbience();
+    dreamAudio.startUnderwaterAmbience(false);
 
     const resumeAudio = () => {
       dreamAudio.stopAllNonUnderwaterMusic();
-      dreamAudio.startUnderwaterAmbience();
+      dreamAudio.startUnderwaterAmbience(false);
     };
     window.addEventListener('pointerdown', resumeAudio, { once: true });
     window.addEventListener('touchstart', resumeAudio, { once: true });
@@ -199,7 +199,7 @@ export const AboutMePage: React.FC = () => {
     setIsMuted(muted);
     if (!muted) {
       dreamAudio.playPop();
-      dreamAudio.startUnderwaterAmbience();
+      dreamAudio.startUnderwaterAmbience(false);
     } else {
       dreamAudio.stopUnderwaterAmbience(0.5);
       dreamAudio.stopScrollingBubbleSound();

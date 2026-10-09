@@ -2448,7 +2448,7 @@ class SkyAudioPlayer {
   private underwaterSonarTimer: ReturnType<typeof setInterval> | null = null;
   private underwaterAudioElement: HTMLAudioElement | null = null;
 
-  public startUnderwaterAmbience(): void {
+  public startUnderwaterAmbience(includeProceduralLayers: boolean = true): void {
     // 1. Immediately kill any World Page sky music, journey music, or space soundtrack
     this.stopAllNonUnderwaterMusic();
 
@@ -2456,18 +2456,18 @@ class SkyAudioPlayer {
     if (typeof Audio !== 'undefined') {
       try {
         if (!this.underwaterAudioElement) {
-          this.underwaterAudioElement = new Audio('/underwater-background-music.mp3');
+          this.underwaterAudioElement = new Audio('/about-underwater-ambience.mp3');
           this.underwaterAudioElement.loop = true;
           this.underwaterAudioElement.preload = 'auto';
         }
-        this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.65;
+        this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.55;
         if (!this.isMuted) {
           this.underwaterAudioElement.play().catch(() => {});
         }
       } catch {}
     }
 
-    if (this.isMuted) return;
+    if (this.isMuted || !includeProceduralLayers) return;
     this.initContext();
     if (!this.ctx) return;
 
@@ -2982,32 +2982,110 @@ class SkyAudioPlayer {
     } catch {}
   }
 
-  // Resonant water bubble "bloop"
-  public playUnderwaterBubble(pitchVariation: number = 1.0): void {
+  private playBubbleResonance(
+    baseFrequency: number,
+    peakGain: number,
+    duration: number,
+    pan: number
+  ): void {
     if (this.isMuted) return;
     this.initContext();
-    if (!this.ctx) return;
+    const ctx = this.ctx;
+    if (!ctx) return;
 
     try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      const now = ctx.currentTime;
+      const fundamental = ctx.createOscillator();
+      const overtone = ctx.createOscillator();
+      const toneFilter = ctx.createBiquadFilter();
+      const overtoneGain = ctx.createGain();
+      const noise = ctx.createBufferSource();
+      const noiseFilter = ctx.createBiquadFilter();
+      const noiseGain = ctx.createGain();
+      const mix = ctx.createGain();
+      const output = ctx.createGain();
 
-      osc.type = 'sine';
-      const baseFreq = (380 + Math.random() * 180) * pitchVariation;
-      osc.frequency.setValueAtTime(baseFreq, now);
-      // Rapid upward pitch sweep creates classic aquatic bubble sound
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.9, now + 0.08);
+      fundamental.type = 'sine';
+      fundamental.frequency.setValueAtTime(baseFrequency, now);
+      fundamental.frequency.exponentialRampToValueAtTime(
+        baseFrequency * 1.16,
+        now + duration * 0.72
+      );
 
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.065, now + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      overtone.type = 'sine';
+      overtone.frequency.setValueAtTime(baseFrequency * 2.08, now);
+      overtone.frequency.exponentialRampToValueAtTime(
+        baseFrequency * 2.28,
+        now + duration * 0.62
+      );
+      overtoneGain.gain.setValueAtTime(0.16, now);
 
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.16);
+      toneFilter.type = 'lowpass';
+      toneFilter.frequency.setValueAtTime(
+        Math.max(900, Math.min(2200, baseFrequency * 4.2)),
+        now
+      );
+      toneFilter.frequency.exponentialRampToValueAtTime(
+        Math.max(700, baseFrequency * 2.6),
+        now + duration
+      );
+      toneFilter.Q.setValueAtTime(1.35, now);
+
+      noise.buffer = this.getNoiseBuffer(ctx);
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.setValueAtTime(
+        Math.max(800, Math.min(1700, baseFrequency * 2.8)),
+        now
+      );
+      noiseFilter.Q.setValueAtTime(0.8, now);
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.linearRampToValueAtTime(peakGain * 0.12, now + 0.006);
+      noiseGain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        now + Math.min(0.055, duration * 0.3)
+      );
+
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.linearRampToValueAtTime(peakGain, now + 0.012);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      fundamental.connect(toneFilter);
+      overtone.connect(overtoneGain);
+      overtoneGain.connect(toneFilter);
+      toneFilter.connect(mix);
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(mix);
+
+      if (typeof ctx.createStereoPanner === 'function') {
+        const panner = ctx.createStereoPanner();
+        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, pan)), now);
+        mix.connect(panner);
+        panner.connect(output);
+      } else {
+        mix.connect(output);
+      }
+
+      output.connect(ctx.destination);
+      fundamental.start(now);
+      overtone.start(now);
+      noise.start(now);
+      fundamental.stop(now + duration + 0.02);
+      overtone.stop(now + duration + 0.02);
+      noise.stop(now + Math.min(0.06, duration * 0.35));
     } catch {}
+  }
+
+  // A soft double-resonant bloop with a filtered water texture.
+  public playUnderwaterBubble(pitchVariation: number = 1.0): void {
+    const variation = Math.max(0.75, Math.min(1.35, pitchVariation));
+    const baseFrequency = (220 + Math.random() * 240) * variation;
+    this.playBubbleResonance(
+      baseFrequency,
+      0.032 + Math.random() * 0.008,
+      0.18 + Math.random() * 0.08,
+      (Math.random() - 0.5) * 0.4
+    );
   }
 
   // Soft aquatic fish tail swish
@@ -3083,12 +3161,13 @@ class SkyAudioPlayer {
       this.playNaturalBubblePop(this.lastScrollBubbleVelocity);
     } catch {}
 
-    // Dynamic interval: faster scroll = lively bubbling (45ms - 75ms)
-    // slower scroll = gentle bubbling (85ms - 135ms)
-    const baseInterval = Math.max(45, 130 - Math.min(85, this.lastScrollBubbleVelocity * 0.35));
-    // Organic jitter prevents repetitive machine-gun rhythm
-    const jitter = (Math.random() - 0.5) * 30;
-    const interval = Math.max(38, baseInterval + jitter);
+    // Keep fast movement lively without a dense, machine-gun stream of pops.
+    const baseInterval = Math.max(
+      115,
+      225 - Math.min(110, this.lastScrollBubbleVelocity * 0.28)
+    );
+    const jitter = (Math.random() - 0.5) * 34;
+    const interval = Math.max(95, baseInterval + jitter);
 
     this.scrollBubbleTimer = setTimeout(() => {
       this.scheduleNextScrollBubble();
@@ -3107,105 +3186,30 @@ class SkyAudioPlayer {
     }
   }
 
-  // Plays a single natural organic bubble pop with pitch sweep and soft lowpass envelope
+  // Plays one quiet bubble when the scroll velocity calls for a water trail.
   private playNaturalBubblePop(velocity: number = 20): void {
-    if (this.isMuted || !this.ctx) return;
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const filter = this.ctx.createBiquadFilter();
-
-      // Organic liquid bubble frequencies across 3 octaves (320Hz to 880Hz)
-      const bubbleFrequencies = [340, 410, 480, 560, 630, 720, 800, 890];
-      const baseFreq = bubbleFrequencies[Math.floor(Math.random() * bubbleFrequencies.length)] * (0.92 + Math.random() * 0.16);
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(baseFreq, now);
-      // Upward pitch flare simulates water surface tension release
-      const sweepFactor = 1.4 + Math.random() * 0.45;
-      const duration = 0.05 + Math.random() * 0.035; // 50ms - 85ms
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * sweepFactor, now + duration * 0.85);
-
-      // Lowpass resonant filter keeps bubbles submerged and liquid
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1300, now);
-      filter.frequency.exponentialRampToValueAtTime(650, now + duration);
-      filter.Q.setValueAtTime(2.2, now);
-
-      // Gentle, soothing volume envelope
-      const vol = Math.min(0.048, 0.02 + Math.min(0.028, velocity * 0.0003));
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(vol, now + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc.connect(filter);
-
-      if (typeof this.ctx.createStereoPanner === 'function') {
-        const panner = this.ctx.createStereoPanner();
-        panner.pan.setValueAtTime((Math.random() - 0.5) * 0.6, now);
-        filter.connect(panner);
-        panner.connect(gain);
-      } else {
-        filter.connect(gain);
-      }
-
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration + 0.02);
-    } catch {}
+    const baseFrequency = 220 + Math.random() * 280;
+    const volume = Math.min(0.025, 0.014 + Math.max(0, velocity) * 0.00006);
+    this.playBubbleResonance(
+      baseFrequency,
+      volume,
+      0.16 + Math.random() * 0.08,
+      (Math.random() - 0.5) * 0.55
+    );
   }
 
   // ── SYNCHRONIZED BUBBLE PARTICLE POP ─────────────────────────────────────
   // Exactly matches each floating bubble particle emitted behind the fish
   public playSynchronizedBubble(sizePx: number = 14, panX: number = 0): void {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
-
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const filter = this.ctx.createBiquadFilter();
-
-      // Pitch is inversely proportional to bubble size:
-      // Small bubbles (~6px) -> ~780Hz "bloop"
-      // Large bubbles (~24px) -> ~360Hz "blup"
-      const sizeNorm = Math.max(0, Math.min(1, (sizePx - 6) / 18));
-      const baseFreq = (780 - sizeNorm * 410) + (Math.random() - 0.5) * 50;
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(baseFreq, now);
-      // Fast exponential upward pop sweep
-      const sweepFactor = 1.45 + (1 - sizeNorm) * 0.35;
-      const duration = 0.045 + sizeNorm * 0.035;
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * sweepFactor, now + duration * 0.85);
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(1400 - sizeNorm * 450, now);
-      filter.Q.setValueAtTime(2.4, now);
-
-      const vol = 0.032 + sizeNorm * 0.022;
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(vol, now + 0.008);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      osc.connect(filter);
-
-      if (typeof this.ctx.createStereoPanner === 'function') {
-        const panner = this.ctx.createStereoPanner();
-        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, panX)), now);
-        filter.connect(panner);
-        panner.connect(gain);
-      } else {
-        filter.connect(gain);
-      }
-
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration + 0.02);
-    } catch {}
+    const sizeNorm = Math.max(0, Math.min(1, (sizePx - 8) / 15));
+    const baseFrequency = (610 - sizeNorm * 330) * (0.96 + Math.random() * 0.08);
+    const volume = 0.018 + sizeNorm * 0.01;
+    this.playBubbleResonance(
+      baseFrequency,
+      volume,
+      0.16 + sizeNorm * 0.08,
+      Math.max(-0.7, Math.min(0.7, panX))
+    );
   }
 
   // ── WORLD TRANSITIONS SFX ──────────────────────────────────────────────
