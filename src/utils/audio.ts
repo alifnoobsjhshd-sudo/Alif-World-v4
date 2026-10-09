@@ -3096,7 +3096,11 @@ class SkyAudioPlayer {
   }
 
   private playBubbleSample(volume: number, durationMs: number): void {
-    if (this.isMuted || this.isScrollBubbling) return;
+    if (
+      this.isMuted ||
+      this.isScrollBubbling ||
+      (this.bubbleLoopAudioElement && !this.bubbleLoopAudioElement.paused)
+    ) return;
     const now = Date.now();
     if (now - this.lastBubbleOneShotAt < 140) return;
 
@@ -3183,16 +3187,19 @@ class SkyAudioPlayer {
         this.isScrollBubbling = true;
         this.startScrollingBubbleLoop();
       }
+      this.scrollBubbleStopTimeout = window.setTimeout(() => {
+        this.stopScrollingBubbleSound();
+      }, 80);
     } else {
       if (this.isScrollBubbling && !this.scrollBubbleStopTimeout) {
         this.scrollBubbleStopTimeout = setTimeout(() => {
           this.stopScrollingBubbleSound();
-        }, 160);
+        }, 80);
       }
     }
   }
 
-  public stopScrollingBubbleSound(fadeMs: number = 150): void {
+  public stopScrollingBubbleSound(fadeMs: number = 120): void {
     this.isScrollBubbling = false;
     if (this.scrollBubbleStopTimeout) {
       clearTimeout(this.scrollBubbleStopTimeout);
@@ -3221,15 +3228,13 @@ class SkyAudioPlayer {
   }
 
   // ── SYNCHRONIZED BUBBLE PARTICLE POP ─────────────────────────────────────
-  // Short, rate-limited excerpts from the same bubbling recording.
-  public playSynchronizedBubble(sizePx: number = 14, panX: number = 0): void {
-    const sizeNorm = Math.max(0, Math.min(1, (sizePx - 8) / 15));
-    void panX;
-    this.playBubbleSample(0.2 + sizeNorm * 0.06, 520 + sizeNorm * 100);
+  // The scroll loop supplies the bubble sound bed; avoid layering a clip on every particle.
+  public playSynchronizedBubble(_sizePx: number = 14, _panX: number = 0): void {
+    return;
   }
 
   public playUnderwaterBubble(_pitchVariation: number = 1.0): void {
-    this.playBubbleSample(0.25, 650);
+    this.playBubbleSample(0.25, 420);
   }
 
   // ── WORLD TRANSITIONS SFX ──────────────────────────────────────────────

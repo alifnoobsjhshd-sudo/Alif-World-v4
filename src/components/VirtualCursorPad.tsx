@@ -5,6 +5,18 @@ import { MousePointer, Move, Zap, Crosshair, ChevronDown, ChevronUp, RotateCcw, 
 
 export const isVirtualCursorEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
+
+  // Environment flags are a hard disable, even if a query string or local setting enables it.
+  const runtimeEnv = (import.meta as any).env;
+  const envValues = [
+    typeof process !== 'undefined' ? process.env.CURSER : undefined,
+    runtimeEnv?.VITE_CURSER,
+    runtimeEnv?.CURSER,
+  ];
+  if (envValues.some((value) => String(value ?? '').trim().toLowerCase() === 'true')) {
+    return false;
+  }
+
   // If explicitly requested via query parameter
   const search = new URLSearchParams(window.location.search);
   const q = search.get('CURSER') || search.get('curser') || search.get('cursor');
@@ -15,16 +27,12 @@ export const isVirtualCursorEnabled = (): boolean => {
   if (ls === 'true') return true;
   if (ls === 'false') return false;
 
-  // Check build/environment variables
-  const envVal = (typeof process !== 'undefined' && process.env?.CURSER) || (import.meta as any).env?.VITE_CURSER || (import.meta as any).env?.CURSER;
-  if (envVal === 'true' || envVal === true) return true;
-
   return false;
 };
 
 export const VirtualCursorPad: React.FC = () => {
   const location = useLocation();
-  const [enabled, setEnabled] = useState(true);
+  const [enabled, setEnabled] = useState(() => isVirtualCursorEnabled());
 
   const path = location.pathname.toLowerCase();
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');

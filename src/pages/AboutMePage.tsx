@@ -97,9 +97,6 @@ export const AboutMePage: React.FC = () => {
   useEffect(() => {
     let lastSwimTime = 0;
     const unsubVel = scrollVelocity.on('change', (v: number) => {
-      // Continuous organic water bubble stream for as long as user is scrolling
-      dreamAudio.updateScrollingBubbleSound(v);
-
       const now = Date.now();
       if (Math.abs(v) > 30 && now - lastSwimTime > 340) {
         lastSwimTime = now;
@@ -134,6 +131,7 @@ export const AboutMePage: React.FC = () => {
       e.preventDefault();
       const deltaY = e.deltaY;
       const delta = Math.max(-100, Math.min(100, deltaY));
+      dreamAudio.updateScrollingBubbleSound(delta * 8.5);
       const current = depthValue.get();
       depthValue.set(Math.max(0, Math.min(MAX_MARINE_DEPTH, current + delta * 8.5)));
     };
@@ -149,6 +147,7 @@ export const AboutMePage: React.FC = () => {
       const currentY = e.touches[0].clientY;
       const diffY = touchStartY.current - currentY;
       touchStartY.current = currentY;
+      dreamAudio.updateScrollingBubbleSound(diffY * 11.0);
 
       const current = depthValue.get();
       depthValue.set(Math.max(0, Math.min(MAX_MARINE_DEPTH, current + diffY * 11.0)));
@@ -156,6 +155,7 @@ export const AboutMePage: React.FC = () => {
 
     const handleTouchEnd = () => {
       touchStartY.current = null;
+      dreamAudio.stopScrollingBubbleSound();
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {

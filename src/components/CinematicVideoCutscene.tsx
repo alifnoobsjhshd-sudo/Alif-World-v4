@@ -96,7 +96,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    video.muted = false;
+    video.muted = true;
     video.preload = 'auto';
 
     const scheduleFailsafe = (delay: number) => {
@@ -154,22 +154,17 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       }
     };
 
-    const playWithMutedFallback = async () => {
+    const playMutedVideo = async () => {
       if (!activeRef.current || completedRef.current) return;
+      video.muted = true;
       try {
         await video.play();
       } catch {
-        if (!activeRef.current || completedRef.current) return;
-        video.muted = true;
-        try {
-          await video.play();
-        } catch {
-          if (activeRef.current && !completedRef.current) setPlaybackIssue('blocked');
-        }
+        if (activeRef.current && !completedRef.current) setPlaybackIssue('blocked');
       }
     };
 
-    const handleCanPlay = () => void playWithMutedFallback();
+    const handleCanPlay = () => void playMutedVideo();
 
     video.addEventListener('playing', handlePlaying);
     video.addEventListener('waiting', handleWaiting);
@@ -220,15 +215,10 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     setPlaybackIssue(null);
     try {
       if (video.error) video.load();
-      video.muted = false;
+      video.muted = true;
       await video.play();
     } catch {
-      try {
-        video.muted = true;
-        await video.play();
-      } catch {
-        setPlaybackIssue('blocked');
-      }
+      setPlaybackIssue('blocked');
     }
   };
 
@@ -258,6 +248,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         ref={videoRef}
         src={videoSrc}
         playsInline
+        muted
         preload={isActive || shouldPreload ? 'auto' : 'none'}
         controls={false}
         disablePictureInPicture

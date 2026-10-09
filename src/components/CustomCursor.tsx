@@ -57,13 +57,9 @@ export const CustomCursor: React.FC = () => {
   }, [isJourney, isCosmic]);
 
   useEffect(() => {
-    // Keep custom cursor enabled for desktop and virtual cursor testing on all devices
-    setHasMouse(true);
-
-    const mediaQuery = window.matchMedia('(pointer: fine)');
-    const handleMediaChange = () => {
-      setHasMouse(true);
-    };
+    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const handleMediaChange = () => setHasMouse(mediaQuery.matches);
+    handleMediaChange();
     mediaQuery.addEventListener('change', handleMediaChange);
 
     return () => {
@@ -72,6 +68,7 @@ export const CustomCursor: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!hasMouse) return;
     let animId: number;
 
     // Initialize to center if not set

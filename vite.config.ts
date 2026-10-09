@@ -9,7 +9,7 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.CURSER': JSON.stringify(env.CURSER || env.VITE_CURSER || 'true'),
+      'process.env.CURSER': JSON.stringify(env.CURSER || env.VITE_CURSER || 'false'),
     },
     resolve: {
       alias: {
