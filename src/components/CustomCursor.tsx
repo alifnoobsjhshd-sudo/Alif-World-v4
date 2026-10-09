@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
+import { isVirtualCursorEnabled } from './VirtualCursorPad';
 
 interface CursorBubble {
   id: number;
@@ -40,6 +41,9 @@ export const CustomCursor: React.FC = () => {
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
   const isCosmic = path.startsWith('/explore-work') || path.startsWith('/space');
   const isProjects = path.startsWith('/project');
+  const canTrackCursor = hasMouse || (
+    isVirtualCursorEnabled() && (isJourney || isCosmic)
+  );
 
   // Page has zero-delay instant cursor tracking (fully sticky with cursor)
   const isInstantPage = isJourney || isAboutMe || isCosmic;
@@ -68,7 +72,7 @@ export const CustomCursor: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!hasMouse) return;
+    if (!canTrackCursor) return;
     let animId: number;
 
     // Initialize to center if not set
@@ -209,7 +213,7 @@ export const CustomCursor: React.FC = () => {
       document.removeEventListener('mouseenter', handleMouseEnterWindow);
       document.removeEventListener('mouseleave', handleMouseLeaveWindow);
     };
-  }, [hasMouse, isVisible, isAboutMe, isHovering, isInstantPage]);
+  }, [canTrackCursor, isVisible, isAboutMe, isHovering, isInstantPage]);
 
   // Periodic bubble cleanup
   useEffect(() => {
@@ -220,7 +224,7 @@ export const CustomCursor: React.FC = () => {
     return () => clearTimeout(timer);
   }, [bubbles]);
 
-  if (!hasMouse) return null;
+  if (!canTrackCursor) return null;
 
   return (
     <div

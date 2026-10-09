@@ -5,11 +5,14 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const virtualCursorEnabled = [env.CURSER, env.VITE_CURSER].some(
+    (value) => value?.trim().toLowerCase() === 'true',
+  );
   return {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.CURSER': JSON.stringify(env.CURSER || env.VITE_CURSER || 'false'),
+      'process.env.CURSER': JSON.stringify(String(virtualCursorEnabled)),
     },
     resolve: {
       alias: {

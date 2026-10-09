@@ -6,33 +6,18 @@ import { MousePointer, Move, Zap, Crosshair, ChevronDown, ChevronUp, RotateCcw, 
 export const isVirtualCursorEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
 
-  // Environment flags are a hard disable, even if a query string or local setting enables it.
   const runtimeEnv = (import.meta as any).env;
   const envValues = [
     typeof process !== 'undefined' ? process.env.CURSER : undefined,
     runtimeEnv?.VITE_CURSER,
     runtimeEnv?.CURSER,
   ];
-  if (envValues.some((value) => String(value ?? '').trim().toLowerCase() === 'true')) {
-    return false;
-  }
-
-  // If explicitly requested via query parameter
-  const search = new URLSearchParams(window.location.search);
-  const q = search.get('CURSER') || search.get('curser') || search.get('cursor');
-  if (q === 'true') return true;
-  if (q === 'false') return false;
-
-  const ls = localStorage.getItem('CURSER') || localStorage.getItem('curser') || localStorage.getItem('cursor');
-  if (ls === 'true') return true;
-  if (ls === 'false') return false;
-
-  return false;
+  return envValues.some((value) => String(value ?? '').trim().toLowerCase() === 'true');
 };
 
 export const VirtualCursorPad: React.FC = () => {
   const location = useLocation();
-  const [enabled, setEnabled] = useState(() => isVirtualCursorEnabled());
+  const enabled = isVirtualCursorEnabled();
 
   const path = location.pathname.toLowerCase();
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
@@ -60,20 +45,16 @@ export const VirtualCursorPad: React.FC = () => {
   const padDragStartRef = useRef<{ startX: number; startY: number; padStartX: number; padStartY: number } | null>(null);
   const lastTouchRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const lastHoverTargetRef = useRef<HTMLElement | null>(null);
 
   const cursorPosRef = useRef(cursorPos);
   cursorPosRef.current = cursorPos;
 
-  // Check if virtual cursor is enabled
-  useEffect(() => {
-    setEnabled(isVirtualCursorEnabled());
-
-    const handleStorageChange = () => {
-      setEnabled(isVirtualCursorEnabled());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+  const getTargetAt = useCallback((x: number, y: number): HTMLElement => {
+    const elements = document.elementsFromPoint(x, y);
+    const target = elements.find((element) => !element.closest('[data-virtual-cursor-pad]'));
+    return (target as HTMLElement | undefined) || document.body;
   }, []);
 
   // Dispatch real mouse and pointer events at the virtual cursor coordinates
@@ -84,17 +65,23 @@ export const VirtualCursorPad: React.FC = () => {
     const clampedX = Math.max(1, Math.min(window.innerWidth - 1, Math.round(x)));
     const clampedY = Math.max(1, Math.min(window.innerHeight - 1, Math.round(y)));
 
-    const target = (document.elementFromPoint(clampedX, clampedY) || document.body) as HTMLElement;
+    const target = getTargetAt(clampedX, clampedY);
 
     // Dispatch hover enter/leave when target element changes
     if (lastHoverTargetRef.current && lastHoverTargetRef.current !== target) {
-      lastHoverTargetRef.current.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false, clientX: clampedX, clientY: clampedY }));
-      lastHoverTargetRef.current.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: clampedX, clientY: clampedY }));
+      const previousTarget = lastHoverTargetRef.current;
+      const exitInit = { bubbles: true, clientX: clampedX, clientY: clampedY, relatedTarget: target };
+      previousTarget.dispatchEvent(new PointerEvent('pointerout', { ...exitInit, pointerId: 1, pointerType: 'mouse' }));
+      previousTarget.dispatchEvent(new PointerEvent('pointerleave', { ...exitInit, bubbles: false, pointerId: 1, pointerType: 'mouse' }));
+      previousTarget.dispatchEvent(new MouseEvent('mouseout', exitInit));
+      previousTarget.dispatchEvent(new MouseEvent('mouseleave', { ...exitInit, bubbles: false }));
     }
     if (target && target !== lastHoverTargetRef.current) {
-      target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: clampedX, clientY: clampedY }));
-      target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: clampedX, clientY: clampedY }));
-      target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, clientX: clampedX, clientY: clampedY }));
+      const enterInit = { bubbles: true, clientX: clampedX, clientY: clampedY, relatedTarget: lastHoverTargetRef.current };
+      target.dispatchEvent(new PointerEvent('pointerover', { ...enterInit, pointerId: 1, pointerType: 'mouse' }));
+      target.dispatchEvent(new PointerEvent('pointerenter', { ...enterInit, bubbles: false, pointerId: 1, pointerType: 'mouse' }));
+      target.dispatchEvent(new MouseEvent('mouseover', enterInit));
+      target.dispatchEvent(new MouseEvent('mouseenter', { ...enterInit, bubbles: false }));
       lastHoverTargetRef.current = target;
     }
 
@@ -141,23 +128,22 @@ export const VirtualCursorPad: React.FC = () => {
     });
     target.dispatchEvent(pointerMoveEvent);
 
-    // 2. Dispatch globally on window so 3D Parallax & CustomCursor track it
-    window.dispatchEvent(new MouseEvent('mousemove', eventInit));
-
-    // 3. Dispatch dedicated custom sync event for CustomCursor
+    // The bubbling mouse event reaches window listeners once; sync the themed cursor separately.
     window.dispatchEvent(
       new CustomEvent('virtual-cursor-move', {
         detail: { x: clampedX, y: clampedY, isHovering: isInteractive },
       })
     );
-  }, []);
+  }, [getTargetAt]);
 
   // Update cursor position and dispatch events
   const updateCursorPosition = useCallback(
     (newX: number, newY: number) => {
       const clampedX = Math.max(4, Math.min(window.innerWidth - 4, Math.round(newX)));
       const clampedY = Math.max(4, Math.min(window.innerHeight - 4, Math.round(newY)));
-      setCursorPos({ x: clampedX, y: clampedY });
+      const nextPosition = { x: clampedX, y: clampedY };
+      cursorPosRef.current = nextPosition;
+      setCursorPos(nextPosition);
       dispatchEventsAt(clampedX, clampedY);
     },
     [dispatchEventsAt]
@@ -175,7 +161,11 @@ export const VirtualCursorPad: React.FC = () => {
     // Notify custom cursor click visual
     window.dispatchEvent(new CustomEvent('virtual-cursor-click'));
 
-    const target = document.elementFromPoint(clampedX, clampedY) || document.body;
+    const target = getTargetAt(clampedX, clampedY);
+    const interactiveTarget = target.closest(
+      'button, a, input, textarea, select, [role="button"], [role="link"], .cursor-pointer, [title], summary',
+    ) as HTMLElement | null;
+    const clickTarget = interactiveTarget || target;
 
     const eventInit = {
       bubbles: true,
@@ -189,26 +179,42 @@ export const VirtualCursorPad: React.FC = () => {
       buttons: 1,
     };
 
-    // PointerDown & MouseDown
+    // PointerDown and MouseDown
     target.dispatchEvent(new PointerEvent('pointerdown', { ...eventInit, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
     target.dispatchEvent(new MouseEvent('mousedown', eventInit));
 
-    // PointerUp, MouseUp & Click
+    // PointerUp and MouseUp, followed by exactly one click/default activation.
     setTimeout(() => {
       target.dispatchEvent(new PointerEvent('pointerup', { ...eventInit, buttons: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
       target.dispatchEvent(new MouseEvent('mouseup', { ...eventInit, buttons: 0 }));
-      target.dispatchEvent(new MouseEvent('click', { ...eventInit, buttons: 0 }));
-
-      // Fallback: If clicked element is inside a clickable button or anchor, trigger native .click()
-      const clickable = (target.closest('button, a, [role="button"]') as HTMLElement | null) || (target as HTMLElement);
-      if (clickable && typeof clickable.click === 'function') {
-        clickable.click();
+      const focusTarget = target.closest('input, textarea, select, [contenteditable="true"]') as HTMLElement | null;
+      focusTarget?.focus({ preventScroll: true });
+      if (clickTarget.matches(':disabled')) return;
+      if (interactiveTarget && typeof clickTarget.click === 'function') {
+        clickTarget.click();
+      } else {
+        target.dispatchEvent(new MouseEvent('click', { ...eventInit, buttons: 0 }));
       }
     }, 45);
-  }, []);
+  }, [getTargetAt]);
+
+  const triggerScroll = useCallback((deltaY: number) => {
+    const { x, y } = cursorPosRef.current;
+    const target = getTargetAt(x, y);
+    target.dispatchEvent(new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      deltaY,
+      deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+    }));
+  }, [getTargetAt]);
 
   // ── Dragging the Touchpad Widget Window Anywhere on Screen ─────────────────
   const handlePadHeaderPointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     setIsDraggingPad(true);
     padDragStartRef.current = {
@@ -241,19 +247,21 @@ export const VirtualCursorPad: React.FC = () => {
   // ── Trackpad Surface Interaction (Relative Mouse Movement + Tap to Click) ─
   // Uses Pointer Capture so touching never cancels, loses focus, or hides the cursor
   const handleTrackpadPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary || activePointerIdRef.current !== null) return;
     e.preventDefault();
     e.stopPropagation();
 
     try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
 
+    activePointerIdRef.current = e.pointerId;
     lastTouchRef.current = { x: e.clientX, y: e.clientY };
     touchMovedRef.current = false;
   };
 
   const handleTrackpadPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!lastTouchRef.current) return;
+    if (activePointerIdRef.current !== e.pointerId || !lastTouchRef.current) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -271,11 +279,12 @@ export const VirtualCursorPad: React.FC = () => {
   };
 
   const handleTrackpadPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
     e.preventDefault();
     e.stopPropagation();
 
     try {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {}
 
     // Quick tap without dragging fires click at cursor coordinates
@@ -283,8 +292,31 @@ export const VirtualCursorPad: React.FC = () => {
       triggerClick();
     }
 
+    activePointerIdRef.current = null;
     lastTouchRef.current = null;
     touchMovedRef.current = false;
+  };
+
+  const handleTrackpadPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    activePointerIdRef.current = null;
+    lastTouchRef.current = null;
+    touchMovedRef.current = false;
+  };
+
+  const toggleTouchpad = () => {
+    const expand = isMinimized;
+    if (expand) {
+      setPadPos((position) => ({
+        ...position,
+        y: Math.max(8, Math.min(position.y, window.innerHeight - 390)),
+      }));
+    }
+    setIsMinimized((prev) => !prev);
+  };
+
+  const stopPageTouch = (event: React.TouchEvent<HTMLDivElement>) => {
+    event.stopPropagation();
   };
 
   // Center cursor shortcut
@@ -352,7 +384,12 @@ export const VirtualCursorPad: React.FC = () => {
 
       {/* ── 2. DRAGGABLE VIRTUAL TOUCHPAD CONTROLLER WINDOW ────────────────────── */}
       <div
-        className="fixed z-[99998] select-none"
+        data-virtual-cursor-pad
+        onTouchStart={stopPageTouch}
+        onTouchMove={stopPageTouch}
+        onTouchEnd={stopPageTouch}
+        onTouchCancel={stopPageTouch}
+        className="fixed z-[99998] select-none touch-none"
         style={{
           left: padPos.x,
           top: padPos.y,
@@ -384,7 +421,7 @@ export const VirtualCursorPad: React.FC = () => {
               </span>
               <button
                 type="button"
-                onClick={() => setIsMinimized((prev) => !prev)}
+                onClick={toggleTouchpad}
                 className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                 title={isMinimized ? 'Expand Touchpad' : 'Minimize Touchpad'}
               >
@@ -409,7 +446,8 @@ export const VirtualCursorPad: React.FC = () => {
                 onPointerDown={handleTrackpadPointerDown}
                 onPointerMove={handleTrackpadPointerMove}
                 onPointerUp={handleTrackpadPointerUp}
-                onPointerCancel={handleTrackpadPointerUp}
+                onPointerCancel={handleTrackpadPointerCancel}
+                onLostPointerCapture={handleTrackpadPointerCancel}
                 className="relative w-full h-36 sm:h-40 rounded-xl bg-gradient-to-b from-slate-950/90 to-slate-900/90 border border-cyan-500/30 shadow-inner flex flex-col items-center justify-center cursor-crosshair active:border-cyan-400 transition-colors overflow-hidden group touch-none"
               >
                 {/* Subtle Grid texture */}
@@ -470,6 +508,27 @@ export const VirtualCursorPad: React.FC = () => {
                 >
                   <MousePointer className="w-3 h-3 text-cyan-400" />
                   <span>{sensitivity === 1.2 ? 'Slow' : sensitivity === 1.8 ? 'Norm' : 'Fast'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => triggerScroll(-60)}
+                  aria-label="Scroll up at the virtual cursor"
+                  className="flex min-h-9 items-center justify-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-600/20 px-2 py-1.5 text-[11px] font-medium text-cyan-100 transition-colors hover:bg-cyan-600/40"
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  <span>Scroll up</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerScroll(60)}
+                  aria-label="Scroll down at the virtual cursor"
+                  className="flex min-h-9 items-center justify-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-600/20 px-2 py-1.5 text-[11px] font-medium text-cyan-100 transition-colors hover:bg-cyan-600/40"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  <span>Scroll down</span>
                 </button>
               </div>
             </div>

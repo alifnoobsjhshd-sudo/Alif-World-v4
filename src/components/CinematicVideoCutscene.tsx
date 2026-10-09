@@ -143,6 +143,8 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       }, STALL_TIMEOUT_MS);
     };
 
+    const handleStalled = () => handleWaiting();
+
     const handleError = () => {
       windAudio.pause();
       setPlaybackIssue('error');
@@ -168,6 +170,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     video.addEventListener('playing', handlePlaying);
     video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('stalled', handleStalled);
     video.addEventListener('error', handleError);
     video.addEventListener('pause', handlePause);
     video.addEventListener('loadedmetadata', handleMetadata);
@@ -186,6 +189,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     return () => {
       video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('stalled', handleStalled);
       video.removeEventListener('error', handleError);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('loadedmetadata', handleMetadata);
