@@ -21,6 +21,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   videoSrc,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const windAudioRef = useRef<HTMLAudioElement | null>(null);
   const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const activeRef = useRef(isActive);
@@ -39,19 +40,49 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     timersRef.current = {};
   }, []);
 
+  const getWindAudio = useCallback(() => {
+    if (!windAudioRef.current) {
+      const audio = new Audio('/cutscene-wind.mp3');
+      audio.loop = true;
+      audio.preload = 'auto';
+      audio.volume = 0.58;
+      windAudioRef.current = audio;
+    }
+    return windAudioRef.current;
+  }, []);
+
+  const stopWindAudio = useCallback((reset = true) => {
+    const audio = windAudioRef.current;
+    if (!audio) return;
+    audio.pause();
+    if (reset) {
+      try {
+        audio.currentTime = 0;
+      } catch {}
+    }
+  }, []);
+
   const complete = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
     clearPlaybackTimers();
+    stopWindAudio();
     videoRef.current?.pause();
     onCompleteRef.current();
-  }, [clearPlaybackTimers]);
+  }, [clearPlaybackTimers, stopWindAudio]);
+
+  useEffect(() => {
+    if (!shouldPreload || isActive) return;
+    const audio = getWindAudio();
+    if (audio.readyState === HTMLMediaElement.HAVE_NOTHING) audio.load();
+  }, [getWindAudio, isActive, shouldPreload]);
 
   useEffect(() => {
     if (!isActive) {
       completedRef.current = false;
       setPlaybackIssue(null);
       clearPlaybackTimers();
+      stopWindAudio();
       return;
     }
 
@@ -61,6 +92,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     const video = videoRef.current;
     if (!video) return;
+    const windAudio = getWindAudio();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -84,9 +116,25 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         timersRef.current.stall = undefined;
       }
       setPlaybackIssue(null);
+      if (windAudio.paused) {
+        if (Number.isFinite(windAudio.duration) && windAudio.duration > 0) {
+          const expectedTime = video.currentTime % windAudio.duration;
+          if (Math.abs(windAudio.currentTime - expectedTime) > 0.75) {
+            try {
+              windAudio.currentTime = expectedTime;
+            } catch {}
+          }
+        }
+        windAudio.play().then(() => {
+          if (!activeRef.current || completedRef.current || video.paused || video.ended) {
+            windAudio.pause();
+          }
+        }).catch(() => {});
+      }
     };
 
     const handleWaiting = () => {
+      windAudio.pause();
       if (timersRef.current.stall !== undefined) {
         window.clearTimeout(timersRef.current.stall);
       }
@@ -95,7 +143,11 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       }, STALL_TIMEOUT_MS);
     };
 
-    const handleError = () => setPlaybackIssue('error');
+    const handleError = () => {
+      windAudio.pause();
+      setPlaybackIssue('error');
+    };
+    const handlePause = () => windAudio.pause();
     const handleMetadata = () => {
       if (Number.isFinite(video.duration) && video.duration > 0) {
         scheduleFailsafe(Math.max(PLAYBACK_FAILSAFE_MS, video.duration * 1000 + 20_000));
@@ -122,6 +174,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     video.addEventListener('playing', handlePlaying);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('error', handleError);
+    video.addEventListener('pause', handlePause);
     video.addEventListener('loadedmetadata', handleMetadata);
     scheduleFailsafe(PLAYBACK_FAILSAFE_MS);
     timersRef.current.startup = window.setTimeout(() => {
@@ -139,13 +192,15 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('error', handleError);
+      video.removeEventListener('pause', handlePause);
       video.removeEventListener('loadedmetadata', handleMetadata);
       video.removeEventListener('canplay', handleCanPlay);
       video.pause();
+      stopWindAudio();
       clearPlaybackTimers();
       document.body.style.overflow = previousOverflow;
     };
-  }, [clearPlaybackTimers, complete, isActive, videoSrc]);
+  }, [clearPlaybackTimers, complete, getWindAudio, isActive, stopWindAudio, videoSrc]);
 
   useEffect(() => {
     if (!isActive) return;

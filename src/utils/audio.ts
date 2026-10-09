@@ -1655,6 +1655,9 @@ class SkyAudioPlayer {
   // Toggle Mute
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.stopBubbleSounds(0);
+    }
     if (this.underwaterAudioElement) {
       this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.55;
       if (this.isMuted) {
@@ -2982,112 +2985,6 @@ class SkyAudioPlayer {
     } catch {}
   }
 
-  private playBubbleResonance(
-    baseFrequency: number,
-    peakGain: number,
-    duration: number,
-    pan: number
-  ): void {
-    if (this.isMuted) return;
-    this.initContext();
-    const ctx = this.ctx;
-    if (!ctx) return;
-
-    try {
-      const now = ctx.currentTime;
-      const fundamental = ctx.createOscillator();
-      const overtone = ctx.createOscillator();
-      const toneFilter = ctx.createBiquadFilter();
-      const overtoneGain = ctx.createGain();
-      const noise = ctx.createBufferSource();
-      const noiseFilter = ctx.createBiquadFilter();
-      const noiseGain = ctx.createGain();
-      const mix = ctx.createGain();
-      const output = ctx.createGain();
-
-      fundamental.type = 'sine';
-      fundamental.frequency.setValueAtTime(baseFrequency, now);
-      fundamental.frequency.exponentialRampToValueAtTime(
-        baseFrequency * 1.16,
-        now + duration * 0.72
-      );
-
-      overtone.type = 'sine';
-      overtone.frequency.setValueAtTime(baseFrequency * 2.08, now);
-      overtone.frequency.exponentialRampToValueAtTime(
-        baseFrequency * 2.28,
-        now + duration * 0.62
-      );
-      overtoneGain.gain.setValueAtTime(0.16, now);
-
-      toneFilter.type = 'lowpass';
-      toneFilter.frequency.setValueAtTime(
-        Math.max(900, Math.min(2200, baseFrequency * 4.2)),
-        now
-      );
-      toneFilter.frequency.exponentialRampToValueAtTime(
-        Math.max(700, baseFrequency * 2.6),
-        now + duration
-      );
-      toneFilter.Q.setValueAtTime(1.35, now);
-
-      noise.buffer = this.getNoiseBuffer(ctx);
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.setValueAtTime(
-        Math.max(800, Math.min(1700, baseFrequency * 2.8)),
-        now
-      );
-      noiseFilter.Q.setValueAtTime(0.8, now);
-      noiseGain.gain.setValueAtTime(0.0001, now);
-      noiseGain.gain.linearRampToValueAtTime(peakGain * 0.12, now + 0.006);
-      noiseGain.gain.exponentialRampToValueAtTime(
-        0.0001,
-        now + Math.min(0.055, duration * 0.3)
-      );
-
-      output.gain.setValueAtTime(0.0001, now);
-      output.gain.linearRampToValueAtTime(peakGain, now + 0.012);
-      output.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      fundamental.connect(toneFilter);
-      overtone.connect(overtoneGain);
-      overtoneGain.connect(toneFilter);
-      toneFilter.connect(mix);
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(mix);
-
-      if (typeof ctx.createStereoPanner === 'function') {
-        const panner = ctx.createStereoPanner();
-        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, pan)), now);
-        mix.connect(panner);
-        panner.connect(output);
-      } else {
-        mix.connect(output);
-      }
-
-      output.connect(ctx.destination);
-      fundamental.start(now);
-      overtone.start(now);
-      noise.start(now);
-      fundamental.stop(now + duration + 0.02);
-      overtone.stop(now + duration + 0.02);
-      noise.stop(now + Math.min(0.06, duration * 0.35));
-    } catch {}
-  }
-
-  // A soft double-resonant bloop with a filtered water texture.
-  public playUnderwaterBubble(pitchVariation: number = 1.0): void {
-    const variation = Math.max(0.75, Math.min(1.35, pitchVariation));
-    const baseFrequency = (220 + Math.random() * 240) * variation;
-    this.playBubbleResonance(
-      baseFrequency,
-      0.032 + Math.random() * 0.008,
-      0.18 + Math.random() * 0.08,
-      (Math.random() - 0.5) * 0.4
-    );
-  }
-
   // Soft aquatic fish tail swish
   public playFishTailSwish(): void {
     if (this.isMuted) return;
@@ -3122,19 +3019,160 @@ class SkyAudioPlayer {
 
   // ── CONTINUOUS SCROLLING BUBBLE SOUND STREAM ──────────────────────────────
   // Naturally streams organic, soft water bubbles for as long as user is scrolling
-  private scrollBubbleTimer: ReturnType<typeof setTimeout> | null = null;
   private isScrollBubbling = false;
-  private lastScrollBubbleVelocity = 0;
   private scrollBubbleStopTimeout: ReturnType<typeof setTimeout> | null = null;
+  private bubbleLoopAudioElement: HTMLAudioElement | null = null;
+  private bubbleLoopFadeInterval: number | null = null;
+  private bubbleOneShotPool: HTMLAudioElement[] = [];
+  private bubbleOneShotStopTimers = new Map<HTMLAudioElement, number>();
+  private bubbleOneShotFadeIntervals = new Map<HTMLAudioElement, number>();
+  private lastBubbleOneShotAt = 0;
+
+  private getBubbleLoopAudio(): HTMLAudioElement | null {
+    if (!this.bubbleLoopAudioElement && typeof Audio !== 'undefined') {
+      this.bubbleLoopAudioElement = new Audio('/about-bubbles-loop.mp3');
+      this.bubbleLoopAudioElement.loop = true;
+      this.bubbleLoopAudioElement.preload = 'auto';
+      this.bubbleLoopAudioElement.volume = 0;
+    }
+    return this.bubbleLoopAudioElement;
+  }
+
+  private fadeBubbleLoopTo(targetVolume: number, durationMs: number, pauseAtEnd: boolean): void {
+    const audio = this.bubbleLoopAudioElement;
+    if (!audio) return;
+
+    if (this.bubbleLoopFadeInterval !== null) {
+      window.clearInterval(this.bubbleLoopFadeInterval);
+      this.bubbleLoopFadeInterval = null;
+    }
+
+    if (durationMs <= 0) {
+      audio.volume = targetVolume;
+      if (pauseAtEnd) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+      return;
+    }
+
+    const startVolume = audio.volume;
+    const startedAt = Date.now();
+    this.bubbleLoopFadeInterval = window.setInterval(() => {
+      const progress = Math.min(1, (Date.now() - startedAt) / durationMs);
+      audio.volume = startVolume + (targetVolume - startVolume) * progress;
+
+      if (progress >= 1 && this.bubbleLoopFadeInterval !== null) {
+        window.clearInterval(this.bubbleLoopFadeInterval);
+        this.bubbleLoopFadeInterval = null;
+        if (pauseAtEnd) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }
+    }, 20);
+  }
+
+  private startScrollingBubbleLoop(): void {
+    const audio = this.getBubbleLoopAudio();
+    if (!audio || this.isMuted) return;
+
+    if (!audio.paused) {
+      this.fadeBubbleLoopTo(0.34, 130, false);
+      return;
+    }
+
+    audio.currentTime = 0;
+    audio.volume = 0;
+    audio.play().then(() => {
+      if (this.isMuted || !this.isScrollBubbling) {
+        this.stopScrollingBubbleSound(0);
+        return;
+      }
+      this.fadeBubbleLoopTo(0.34, 180, false);
+    }).catch(() => {
+      this.isScrollBubbling = false;
+    });
+  }
+
+  private playBubbleSample(volume: number, durationMs: number): void {
+    if (this.isMuted || this.isScrollBubbling) return;
+    const now = Date.now();
+    if (now - this.lastBubbleOneShotAt < 140) return;
+
+    let audio = this.bubbleOneShotPool.find((sample) => sample.paused || sample.ended);
+    if (!audio && this.bubbleOneShotPool.length < 3 && typeof Audio !== 'undefined') {
+      audio = new Audio('/about-bubbles-loop.mp3');
+      audio.loop = false;
+      audio.preload = 'auto';
+      this.bubbleOneShotPool.push(audio);
+    }
+    if (!audio) return;
+
+    this.lastBubbleOneShotAt = now;
+    audio.loop = false;
+    audio.volume = 0;
+    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA && Number.isFinite(audio.duration)) {
+      const usableDuration = Math.max(0, audio.duration - durationMs / 1000 - 0.08);
+      audio.currentTime = usableDuration > 0 ? Math.random() * usableDuration : 0;
+    } else {
+      audio.currentTime = 0;
+    }
+
+    audio.play().then(() => {
+      if (audio.paused || this.isMuted) {
+        audio.pause();
+        return;
+      }
+
+      const targetVolume = Math.max(0, Math.min(1, volume));
+      const fadeInStarted = Date.now();
+      const fadeInInterval = window.setInterval(() => {
+        const progress = Math.min(1, (Date.now() - fadeInStarted) / 80);
+        audio.volume = targetVolume * progress;
+        if (progress >= 1) {
+          window.clearInterval(fadeInInterval);
+          if (this.bubbleOneShotFadeIntervals.get(audio) === fadeInInterval) {
+            this.bubbleOneShotFadeIntervals.delete(audio);
+          }
+        }
+      }, 20);
+      this.bubbleOneShotFadeIntervals.set(audio, fadeInInterval);
+
+      const stopTimer = window.setTimeout(() => {
+        this.bubbleOneShotStopTimers.delete(audio);
+        const fadeOutStarted = Date.now();
+        const startVolume = audio.volume;
+        const fadeOutInterval = window.setInterval(() => {
+          const progress = Math.min(1, (Date.now() - fadeOutStarted) / 150);
+          audio.volume = startVolume * (1 - progress);
+          if (progress >= 1) {
+            window.clearInterval(fadeOutInterval);
+            if (this.bubbleOneShotFadeIntervals.get(audio) === fadeOutInterval) {
+              this.bubbleOneShotFadeIntervals.delete(audio);
+            }
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = 0;
+          }
+        }, 20);
+        this.bubbleOneShotFadeIntervals.set(audio, fadeOutInterval);
+      }, Math.max(100, durationMs - 150));
+      this.bubbleOneShotStopTimers.set(audio, stopTimer);
+    }).catch(() => {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+    });
+  }
 
   public updateScrollingBubbleSound(velocity: number): void {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
+    if (this.isMuted) {
+      this.stopScrollingBubbleSound(0);
+      return;
+    }
 
     const absVel = Math.abs(velocity);
-    this.lastScrollBubbleVelocity = absVel;
-
     if (absVel > 6) {
       if (this.scrollBubbleStopTimeout) {
         clearTimeout(this.scrollBubbleStopTimeout);
@@ -3143,7 +3181,7 @@ class SkyAudioPlayer {
 
       if (!this.isScrollBubbling) {
         this.isScrollBubbling = true;
-        this.scheduleNextScrollBubble();
+        this.startScrollingBubbleLoop();
       }
     } else {
       if (this.isScrollBubbling && !this.scrollBubbleStopTimeout) {
@@ -3154,62 +3192,44 @@ class SkyAudioPlayer {
     }
   }
 
-  private scheduleNextScrollBubble(): void {
-    if (!this.isScrollBubbling || !this.ctx || this.isMuted) return;
-
-    try {
-      this.playNaturalBubblePop(this.lastScrollBubbleVelocity);
-    } catch {}
-
-    // Keep fast movement lively without a dense, machine-gun stream of pops.
-    const baseInterval = Math.max(
-      115,
-      225 - Math.min(110, this.lastScrollBubbleVelocity * 0.28)
-    );
-    const jitter = (Math.random() - 0.5) * 34;
-    const interval = Math.max(95, baseInterval + jitter);
-
-    this.scrollBubbleTimer = setTimeout(() => {
-      this.scheduleNextScrollBubble();
-    }, interval);
-  }
-
-  public stopScrollingBubbleSound(): void {
+  public stopScrollingBubbleSound(fadeMs: number = 150): void {
     this.isScrollBubbling = false;
-    if (this.scrollBubbleTimer) {
-      clearTimeout(this.scrollBubbleTimer);
-      this.scrollBubbleTimer = null;
-    }
     if (this.scrollBubbleStopTimeout) {
       clearTimeout(this.scrollBubbleStopTimeout);
       this.scrollBubbleStopTimeout = null;
     }
+    if (this.bubbleLoopAudioElement) {
+      this.fadeBubbleLoopTo(0, fadeMs, true);
+    }
   }
 
-  // Plays one quiet bubble when the scroll velocity calls for a water trail.
-  private playNaturalBubblePop(velocity: number = 20): void {
-    const baseFrequency = 220 + Math.random() * 280;
-    const volume = Math.min(0.025, 0.014 + Math.max(0, velocity) * 0.00006);
-    this.playBubbleResonance(
-      baseFrequency,
-      volume,
-      0.16 + Math.random() * 0.08,
-      (Math.random() - 0.5) * 0.55
-    );
+  public stopBubbleSounds(fadeMs: number = 0): void {
+    this.stopScrollingBubbleSound(fadeMs);
+    this.bubbleOneShotPool.forEach((audio) => {
+      const stopTimer = this.bubbleOneShotStopTimers.get(audio);
+      if (stopTimer !== undefined) window.clearTimeout(stopTimer);
+      this.bubbleOneShotStopTimers.delete(audio);
+
+      const fadeInterval = this.bubbleOneShotFadeIntervals.get(audio);
+      if (fadeInterval !== undefined) window.clearInterval(fadeInterval);
+      this.bubbleOneShotFadeIntervals.delete(audio);
+
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 0;
+    });
   }
 
   // ── SYNCHRONIZED BUBBLE PARTICLE POP ─────────────────────────────────────
-  // Exactly matches each floating bubble particle emitted behind the fish
+  // Short, rate-limited excerpts from the same bubbling recording.
   public playSynchronizedBubble(sizePx: number = 14, panX: number = 0): void {
     const sizeNorm = Math.max(0, Math.min(1, (sizePx - 8) / 15));
-    const baseFrequency = (610 - sizeNorm * 330) * (0.96 + Math.random() * 0.08);
-    const volume = 0.018 + sizeNorm * 0.01;
-    this.playBubbleResonance(
-      baseFrequency,
-      volume,
-      0.16 + sizeNorm * 0.08,
-      Math.max(-0.7, Math.min(0.7, panX))
-    );
+    void panX;
+    this.playBubbleSample(0.2 + sizeNorm * 0.06, 520 + sizeNorm * 100);
+  }
+
+  public playUnderwaterBubble(_pitchVariation: number = 1.0): void {
+    this.playBubbleSample(0.25, 650);
   }
 
   // ── WORLD TRANSITIONS SFX ──────────────────────────────────────────────

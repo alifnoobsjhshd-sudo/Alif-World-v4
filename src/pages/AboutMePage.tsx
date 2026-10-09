@@ -90,7 +90,7 @@ export const AboutMePage: React.FC = () => {
       window.removeEventListener('wheel', resumeAudio);
       window.removeEventListener('keydown', resumeAudio);
       dreamAudio.stopUnderwaterAmbience(1.2);
-      dreamAudio.stopScrollingBubbleSound();
+      dreamAudio.stopBubbleSounds(0);
     };
   }, []);
 
@@ -202,7 +202,7 @@ export const AboutMePage: React.FC = () => {
       dreamAudio.startUnderwaterAmbience(false);
     } else {
       dreamAudio.stopUnderwaterAmbience(0.5);
-      dreamAudio.stopScrollingBubbleSound();
+      dreamAudio.stopBubbleSounds(0);
     }
   };
 
