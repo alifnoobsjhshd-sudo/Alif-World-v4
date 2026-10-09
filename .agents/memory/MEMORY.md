@@ -1,1 +1,2 @@
 - [External deployment lockfiles](external-deployment-lockfiles.md) — Keep Replit-only firewall tarball URLs out of locks used by Render or other external builders.
+- [Vite watcher and Replit artifacts](vite-watcher-replit-artifacts.md) — Ignore generated `.local/skills` trees when Vite's recursive watcher hits filesystem `EINVAL` errors.
