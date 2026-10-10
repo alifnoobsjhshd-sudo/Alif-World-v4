@@ -1,34 +1,35 @@
 # Complete Deployment Guide for Render (render.com)
 
-This guide walks you through deploying the **Alif-World Portfolio** on [Render](https://render.com) as a high-performance, 100% free **Static Site** backed by Render's global CDN.
+This guide deploys the **Alif-World Portfolio** on [Render](https://render.com) as one Node Web Service. The Express server serves the built portfolio and the private Grok chatbot API from the same service.
 
 ---
 
-## ⚡ Why Render Static Site?
-- **100% Free**: Unlimited bandwidth on Render's free static tier with free automated SSL.
-- **Fast Global CDN**: Assets are served from edge caches worldwide with HTTP/2 and Brotli compression.
-- **Zero Cold Starts**: Unlike free web services or containers that go to sleep after inactivity, static sites **never sleep** and load instantly.
+## Why a Node Web Service?
+
+- The app needs a server-side `/api/chat` route so the Grok API key is never sent to visitors' browsers.
+- The existing Express server serves both the built frontend and chatbot API; no separate API service is required.
+- A Render Static Site cannot run the API route. The existing Render service must be changed to a Node Web Service.
+- Replit secrets are separate from Render environment variables. Add `AI_API` to the Render service before testing live chat.
 
 ---
 
-## 🚀 Option 1: Automatic Blueprint Deployment (Easiest - 1 Click)
+## Option 1: Deploy from the Blueprint
 
 The repository already includes a pre-configured `render.yaml` file.
 
-1. Push your code to your **GitHub** or **GitLab** account.
-2. Log in to your [Render Dashboard](https://dashboard.render.com).
-3. Click the **"New +"** button in the top navigation bar and select **"Blueprint"**.
-4. Connect your GitHub/GitLab repository.
-5. Render will automatically detect `render.yaml` and configure:
-   - **Service Type**: Static Site
+1. Push the project to your **GitHub** or **GitLab** repository.
+2. Log in to the [Render Dashboard](https://dashboard.render.com), choose **New +** > **Blueprint**, and connect that repository.
+3. Render detects `render.yaml` and should show a **Node Web Service** with these settings:
+   - **Service Type**: Node Web Service
    - **Build Command**: `npm install && npm run build`
-   - **Publish Directory**: `./dist`
-   - **SPA Rewrite Rule**: `/*` → `/index.html` (Prevents 404 errors on `/projects`, `/journey`, etc.)
-6. Click **"Apply"** — Render will build and deploy your site in ~1–2 minutes!
+   - **Start Command**: `npm start`
+   - **Health Check Path**: `/api/health`
+4. Review every proposed change before applying it. A Static Site cannot run the chatbot API; if Render cannot safely update the existing resource, create a separate Web Service and keep the old site until the new one is verified.
+5. In the new service's **Environment** settings, add `AI_API` with the Grok API key. `render.yaml` uses `sync: false`, so Render will not read a key from the repository. If Render prompts for it during Blueprint setup, enter it there instead.
 
 ---
 
-## 🛠️ Option 2: Manual Dashboard Deployment (Step-by-Step)
+## Option 2: Configure a Web Service manually
 
 If you prefer to configure the service manually through the Render UI:
 
@@ -40,9 +41,9 @@ git commit -m "Prepare for Render deployment"
 git push origin main
 ```
 
-### Step 2: Create a New Static Site on Render
+### Step 2: Create a Node Web Service on Render
 1. Open [dashboard.render.com](https://dashboard.render.com).
-2. Click **"New +"** > **"Static Site"**.
+2. Click **"New +"** > **"Web Service"**.
 3. Select and connect your repository from the list.
 
 ### Step 3: Configure Build & Runtime Settings
@@ -53,61 +54,45 @@ Enter the following exact configuration:
 | **Name** | `alif-world-portfolio` | Or any unique subdomain name you prefer |
 | **Branch** | `main` | The default branch you push to |
 | **Root Directory** | *(leave empty)* | Root of your repository |
-| **Build Command** | `npm install && npm run build` | Installs dependencies and runs Vite build |
-| **Publish Directory** | `dist` | Where Vite outputs static production assets |
+| **Runtime** | `Node` | Runs the existing Express server |
+| **Build Command** | `npm install && npm run build` | Installs dependencies and builds the Vite frontend |
+| **Start Command** | `npm start` | Serves the frontend and `/api/chat` |
+| **Health Check Path** | `/api/health` | Confirms the server is responding |
 
 ---
 
-### Step 4: CRITICAL — Set Up SPA Redirect / Rewrite Rule
+### Step 4: Configure the chatbot secret
 
-> ⚠️ **Important for React Router Apps:**
-> Because this application uses client-side routing (`/projects`, `/journey`, `/explore-works`, `/not-available`), directly loading or refreshing these URLs will return a **404 Not Found** unless you add a rewrite rule.
+The chatbot's API key must stay on the server. Do not add it to Vite, `VITE_*` variables, or frontend code.
 
-In the Render site settings:
-1. Scroll down to the **"Redirects/Rewrites"** section.
-2. Click **"Add Rule"**.
-3. Configure the rule:
-   - **Type**: `Rewrite`
-   - **Source**: `/*`
-   - **Destination**: `/index.html`
-4. Click **"Save Changes"**.
+In the Render Web Service's **Environment** settings:
+1. Add `AI_API` and enter the Grok API key there.
+2. Keep the key in Render's server-side environment only. Do not add it to a `VITE_*` variable, client-side code, or source control.
+3. Save the variable. Grok usage and any related charges are associated with the xAI account for that key.
+
+The Express server already handles SPA routes such as `/projects`, `/journey`, and `/chat`; do not add a catch-all Render rewrite that could intercept `/api/chat`.
 
 ---
 
-### Step 5: (Optional) Environment Variables
+### Step 5: Deploy and verify
 
-If you are using client-side or build-time environment variables:
-1. In your Render Static Site settings, go to **"Environment"**.
-2. Click **"Add Environment Variable"**:
-   - `NODE_VERSION`: `20.18.0` (Recommended to ensure modern Node compatibility)
-   - `GEMINI_API_KEY`: *(Your Gemini API key if required)*
-3. Click **"Save Changes"**.
+1. Create the Web Service or choose **Manual Deploy** > **Deploy latest commit**.
+2. Confirm the build completes and the `npm start` process stays running.
+3. Test the service URL shown in Render:
+   - Open `/` to check the portfolio.
+   - Open `/journey` and refresh to check the Express SPA fallback.
+   - Open `/api/health`; it should return `{"status":"ok"}`.
+   - Open `/chat`, send a message, and confirm the assistant replies.
+4. If chat reports that the assistant is not configured, check that `AI_API` is saved in this Web Service's Environment settings, then redeploy.
 
----
-
-### Step 6: Deploy & Verify
-1. Click **"Create Static Site"** (or **"Manual Deploy"** > **"Deploy latest commit"**).
-2. Watch the deployment log:
-   ```text
-   ==> Running build command 'npm install && npm run build'...
-   vite v6.2.3 building for production...
-   ✓ 89 modules transformed.
-   dist/index.html                   2.8 kB │ gzip: 1.1 kB
-   dist/assets/index-D1...js        450.2 kB │ gzip: 120.4 kB
-   ==> Uploading build...
-   ==> Your site is live at: https://alif-world-portfolio.onrender.com
-   ```
-3. Test your live URL:
-   - Visit `https://your-site.onrender.com/` (Landing page)
-   - Click to `/journey` and refresh the browser tab (Verifies SPA rewrite rule)
-   - Click to `/projects` and `/explore-works`
+The site keeps the conversation in page memory and sends only the latest 20 messages with each request. The API does not write visitor messages to a database or logs and sets `store: false` on xAI requests. Do not send passwords, API keys, or other sensitive information in chat.
 
 ---
 
 ## 🌐 Setting Up a Custom Domain (e.g. `yourname.dev` or `yourname.com`)
 
 Render provides free SSL certificates for custom domains:
-1. Go to your Static Site in the Render Dashboard.
+1. Go to your Web Service in the Render Dashboard.
 2. Click **"Settings"** in the left sidebar.
 3. Scroll to **"Custom Domains"** and click **"Add Custom Domain"**.
 4. Enter your domain (e.g., `portfolio.yourname.com` or `yourname.com`).
@@ -129,6 +114,7 @@ Render provides free SSL certificates for custom domains:
 
 | Issue | Cause | Solution |
 |---|---|---|
-| **404 Page Not Found on page reload (`/projects` or `/journey`)** | Missing SPA rewrite rule | Add a Rewrite rule: `Source: /*`, `Destination: /index.html` in the **Redirects/Rewrites** tab. |
-| **Build Fails with Node version incompatibility** | Default builder using an older Node.js version | Add environment variable `NODE_VERSION` = `20.18.0` in the **Environment** tab. |
+| **404 Page Not Found on page reload (`/projects` or `/journey`)** | Server is not running the current `server.cjs` fallback | Confirm the service uses `npm start` and is configured as a Node Web Service. |
+| **Chat says the assistant is not configured** | `AI_API` is missing from Render | Add `AI_API` in the Render Web Service's Environment settings and redeploy. |
+| **Build fails with a Node version incompatibility** | The selected Node runtime does not meet a dependency's requirements | Check the version shown in the deployment logs and set `NODE_VERSION` to an active version supported by Render and the project dependencies. |
 | **Outdated assets showing up after deploy** | Browser cache | Hard-refresh via `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac), or click **"Clear build cache & deploy"** in Render. |

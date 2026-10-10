@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   motion,
   animate,
@@ -23,7 +23,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { LandingPage } from './pages/LandingPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SEO } from './components/SEO';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { STORY_SCENES, SCENE_STEP } from './data/storyline';
 import { StorySceneView } from './components/StorySceneView';
@@ -37,6 +37,9 @@ import { NotAvailablePage } from './pages/NotAvailablePage';
 import { dreamAudio } from './utils/audio';
 import { CustomCursor } from './components/CustomCursor';
 import { VirtualCursorPad } from './components/VirtualCursorPad';
+import { GlobalChatButton } from './components/GlobalChatButton';
+
+const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
 
 const MAX_DEPTH = (STORY_SCENES.length - 1) * SCENE_STEP; // 15 * 3800 = 57,000
 
@@ -409,13 +412,15 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
 
 export default function App() {
   const [initialLoading, setInitialLoading] = useState(true);
+  const { pathname } = useLocation();
 
   return (
     <>
       <CustomCursor />
       <VirtualCursorPad />
+      <GlobalChatButton />
       <AnimatePresence>
-        {initialLoading && (
+        {initialLoading && pathname !== '/chat' && (
           <LoadingScreen onComplete={() => setInitialLoading(false)} />
         )}
       </AnimatePresence>
@@ -432,6 +437,23 @@ export default function App() {
         <Route path="/more-about-him" element={<AboutMePage />} />
         <Route path="/not-available" element={<NotAvailablePage />} />
         <Route path="/unavailable" element={<NotAvailablePage />} />
+        <Route
+          path="/chat"
+          element={(
+            <Suspense
+              fallback={(
+                <div
+                  role="status"
+                  className="fixed inset-0 z-[120] grid place-items-center bg-[#202c50] px-6 text-center font-display text-sm text-white"
+                >
+                  Opening Alif’s assistant…
+                </div>
+              )}
+            >
+              <ChatbotPage />
+            </Suspense>
+          )}
+        />
       </Routes>
     </>
   );

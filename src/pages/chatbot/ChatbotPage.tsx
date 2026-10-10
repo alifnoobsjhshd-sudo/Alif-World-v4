@@ -1,4 +1,4 @@
-import React, { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowDownLeft, ArrowLeft, ArrowUp, Compass, RotateCcw, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -53,23 +53,30 @@ export default function ChatbotPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history.slice(-20) }),
         signal: controller.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(response.status === 429 ? 'A little too much curiosity at once. Please try again shortly.' : 'The signal got a little cloudy. Please try again.');
-      }
-
-      const result: unknown = await response.json();
+      const result: unknown = await response.json().catch(() => null);
       if (
         typeof result !== 'object' ||
         result === null ||
-        !('reply' in result) ||
-        typeof result.reply !== 'string' ||
-        !result.reply.trim()
+        !('reply' in result)
       ) {
-        throw new Error('The reply did not come through. Please try again.');
+        const serverMessage = typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string'
+          ? result.error
+          : response.status === 429
+            ? 'A little too much curiosity at once. Please try again shortly.'
+            : 'The signal got a little cloudy. Please try again.';
+        throw new Error(serverMessage);
+      }
+
+      if (!response.ok || typeof result.reply !== 'string' || !result.reply.trim()) {
+        throw new Error(
+          typeof result.reply === 'string' && !result.reply.trim()
+            ? 'The reply did not come through. Please try again.'
+            : 'The signal got a little cloudy. Please try again.',
+        );
       }
 
       setMessages((current) => [...current, { role: 'assistant', content: result.reply }]);
@@ -556,7 +563,7 @@ export default function ChatbotPage() {
             border: 0;
             border-radius: 0;
           }
-          .alif-chat__side { min-height: 132px; padding: max(16px, env(safe-area-inset-top)) 20px 17px; }
+          .alif-chat__side { min-height: 178px; padding: max(66px, calc(env(safe-area-inset-top) + 58px)) 20px 17px; }
           .alif-chat__side::before { width: 185px; height: 185px; right: -93px; top: -58px; box-shadow: 0 0 0 17px rgba(208,226,255,.035), 0 0 0 39px rgba(208,226,255,.025); }
           .alif-chat__side::after { top: 43px; right: 55px; width: 7px; height: 7px; }
           .alif-chat__brand-mark { width: 31px; height: 31px; border-radius: 10px; }
@@ -696,10 +703,11 @@ export default function ChatbotPage() {
               <textarea
                 className="alif-chat__textarea"
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => setDraft(event.target.value.slice(0, 4_000))}
                 onKeyDown={handleComposerKeyDown}
                 placeholder="Ask about Alif, his work, or the web..."
                 rows={1}
+                maxLength={4_000}
                 aria-label="Your message"
                 disabled={isLoading}
               />

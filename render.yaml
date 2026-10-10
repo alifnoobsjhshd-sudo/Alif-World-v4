@@ -1,10 +1,12 @@
 services:
   - type: web
     name: alif-portfolio
-    env: static
+    runtime: node
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AI_API
+        sync: false

@@ -15,13 +15,13 @@ View your app in AI Studio: https://ai.studio/apps/e4ee0c07-6416-4392-8f39-d8041
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set `AI_API` in Replit Secrets or in your untracked local `.env.local` file for the Grok chat endpoint. Do not prefix it with `VITE_`.
 3. Run the app:
    `npm run dev`
 
 ## Deploy to Render
 
-This app is fully optimized for **[Render](https://render.com)** static site hosting (100% free, automated SSL, global edge CDN, and zero cold starts).
+This app deploys as a **[Render](https://render.com) Node Web Service** so the portfolio and private Grok chat endpoint can run in one service. Set `AI_API` in Render's service environment; Replit secrets are not copied to Render.
 
 - For 1-click blueprint deployment or step-by-step dashboard instructions, see the complete guide: **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)**.
 - A ready-to-use `render.yaml` Blueprint file is included in the project root.

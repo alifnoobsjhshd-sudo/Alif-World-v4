@@ -1,10 +1,16 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { createChatApiApp } = require('./server/chat-api.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DIST_DIR = path.join(__dirname, 'dist');
+
+app.set('trust proxy', 1);
+
+// The same server handles Grok requests and serves the compiled SPA.
+app.use(createChatApiApp());
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -34,5 +40,5 @@ if (fs.existsSync(DIST_DIR)) {
 }
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Static Shim running on http://localhost:${PORT}`);
+  console.log(`Alif-World server listening on port ${PORT}`);
 });

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Compass, Volume2, VolumeX, Mail } from 'lucide-react';
+import { Sparkles, Compass, Volume2, VolumeX } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { CartoonCloudTransition } from '../components/CartoonCloudTransition';
-import { StoryContactModal } from '../components/StoryContactModal';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { LetsDriveButton } from '../components/LetsDriveButton';
 import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
@@ -25,7 +24,6 @@ export const LandingPage: React.FC = () => {
   const [desktopBgSrc, setDesktopBgSrc] = useState(landingBgUser || BG_IMAGE_DESKTOP_LOCAL);
   const [isZooming, setIsZooming] = useState(false);
   const [isCutscenePlaying, setIsCutscenePlaying] = useState(false);
-  const [isContactOpen, setIsContactOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isHoveringStory, setIsHoveringStory] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -584,31 +582,6 @@ export const LandingPage: React.FC = () => {
         onComplete={() => navigate('/world')}
       />
 
-      {/* ── TOP LEFT CONTACT MENU BUTTON (Magnetic Shimmer Stroke) ─────────── */}
-      <motion.div
-        className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] sm:top-5 sm:left-5 md:top-6 md:left-6 z-40"
-        animate={isZooming ? { opacity: 0, pointerEvents: 'none' } : { opacity: 1 }}
-        transition={{ duration: 0.2 }}
-      >
-        <MagneticShimmerButton
-          variant="glass"
-          size="sm"
-          onClick={() => {
-            dreamAudio.playPop();
-            setIsContactOpen(true);
-          }}
-          onMouseEnter={() => dreamAudio.playHover()}
-          title="Contact Menu (Discord, Email, WhatsApp)"
-          aria-label="Open Contact Menu"
-          className="px-4 py-2 sm:py-2.5"
-        >
-          <Mail className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform drop-shadow-sm" />
-          <span className="font-display font-bold text-xs sm:text-sm tracking-wide text-slate-800 drop-shadow-sm">
-            Contact
-          </span>
-        </MagneticShimmerButton>
-      </motion.div>
-
       {/* ── TOP RIGHT AUDIO MUTE BUTTON (Magnetic Shimmer Stroke) ──────────── */}
       <motion.div
         className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] sm:top-5 sm:right-5 md:top-6 md:right-6 z-40"
@@ -630,15 +603,6 @@ export const LandingPage: React.FC = () => {
           )}
         </MagneticShimmerButton>
       </motion.div>
-
-      {/* ── CONTACT MODAL (Opens with Discord alifop24_, Email, WhatsApp) ── */}
-      <StoryContactModal
-        isOpen={isContactOpen}
-        onClose={() => {
-          dreamAudio.playPop();
-          setIsContactOpen(false);
-        }}
-      />
 
       {/* ── ACTION BUTTON: Anchored to Right side in Middle Vertically on Desktop, Bottom Center (Lifted up) on Mobile ──────── */}
       <motion.div
