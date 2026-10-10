@@ -49,40 +49,106 @@ export default function ChatbotPage() {
     const controller = new AbortController();
     requestRef.current = controller;
 
+    // Insert an empty assistant response slot that fills in live
+    setMessages((current) => [...current, { role: 'assistant', content: '' }]);
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
         // The opening assistant greeting is presentation-only, not a model turn.
-        body: JSON.stringify({ messages: history.slice(1).slice(-20) }),
+        body: JSON.stringify({
+          messages: history.slice(1).slice(-20),
+          stream: true,
+        }),
         signal: controller.signal,
       });
 
-      const result: unknown = await response.json().catch(() => null);
-      if (
-        typeof result !== 'object' ||
-        result === null ||
-        !('reply' in result)
-      ) {
-        const serverMessage = typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string'
-          ? result.error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const serverMessage = (errorData && typeof errorData.error === 'string')
+          ? errorData.error
           : response.status === 429
             ? 'A little too much curiosity at once. Please try again shortly.'
             : 'The signal got a little cloudy. Please try again.';
         throw new Error(serverMessage);
       }
 
-      if (!response.ok || typeof result.reply !== 'string' || !result.reply.trim()) {
-        throw new Error(
-          typeof result.reply === 'string' && !result.reply.trim()
-            ? 'The reply did not come through. Please try again.'
-            : 'The signal got a little cloudy. Please try again.',
-        );
-      }
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedReply = '';
 
-      setMessages((current) => [...current, { role: 'assistant', content: result.reply }]);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data:')) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === '[DONE]') break;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              if (parsed.text) {
+                accumulatedReply += parsed.text;
+                setMessages((current) => {
+                  const updated = [...current];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === 'assistant') {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      content: accumulatedReply,
+                    };
+                  }
+                  return updated;
+                });
+              }
+            } catch (jsonErr) {
+              // Ignore non-json lines
+            }
+          }
+        }
+
+        if (!accumulatedReply.trim()) {
+          throw new Error('The reply did not come through. Please try again.');
+        }
+      } else {
+        const result: any = await response.json().catch(() => null);
+        if (!result?.reply) {
+          throw new Error('The reply did not come through. Please try again.');
+        }
+        setMessages((current) => {
+          const updated = [...current];
+          const last = updated[updated.length - 1];
+          if (last && last.role === 'assistant') {
+            updated[updated.length - 1] = { role: 'assistant', content: result.reply };
+          }
+          return updated;
+        });
+      }
     } catch (requestError) {
       if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+      // Remove empty assistant placeholder if failed before stream started
+      setMessages((current) => {
+        const last = current[current.length - 1];
+        if (last && last.role === 'assistant' && !last.content) {
+          return current.slice(0, -1);
+        }
+        return current;
+      });
       setError(requestError instanceof Error ? requestError.message : 'Something went wrong. Please try again.');
     } finally {
       if (requestRef.current === controller) {
@@ -652,18 +718,21 @@ export default function ChatbotPage() {
 
           <div className="alif-chat__feed" ref={feedRef} role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation">
             <p className="alif-chat__date-mark">Your conversation starts here</p>
-            {messages.map((message, index) => (
-              <motion.div
-                key={`${index}-${message.role}`}
-                className={`alif-chat__message-row ${message.role === 'user' ? 'alif-chat__message-row--user' : ''}`}
-                initial={reduceMotion ? false : { opacity: 0, y: 9 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: reduceMotion ? 0 : .28, ease: 'easeOut' }}
-              >
-                {message.role === 'assistant' && <div className="alif-chat__message-mark" aria-hidden="true"><Sparkles size={13} strokeWidth={1.7} /></div>}
-                <div className="alif-chat__bubble">{message.content}</div>
-              </motion.div>
-            ))}
+            {messages.map((message, index) => {
+              if (message.role === 'assistant' && !message.content) return null;
+              return (
+                <motion.div
+                  key={`${index}-${message.role}`}
+                  className={`alif-chat__message-row ${message.role === 'user' ? 'alif-chat__message-row--user' : ''}`}
+                  initial={reduceMotion ? false : { opacity: 0, y: 9 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : .28, ease: 'easeOut' }}
+                >
+                  {message.role === 'assistant' && <div className="alif-chat__message-mark" aria-hidden="true"><Sparkles size={13} strokeWidth={1.7} /></div>}
+                  <div className="alif-chat__bubble">{message.content}</div>
+                </motion.div>
+              );
+            })}
 
             {messages.length === 1 && !isLoading && (
               <div className="alif-chat__suggestions" aria-label="Suggested questions">
@@ -679,7 +748,7 @@ export default function ChatbotPage() {
               </div>
             )}
 
-            {isLoading && (
+            {isLoading && (!messages[messages.length - 1]?.content || messages[messages.length - 1]?.role !== 'assistant') && (
               <div className="alif-chat__message-row" aria-label="Assistant is thinking">
                 <div className="alif-chat__message-mark" aria-hidden="true"><Sparkles size={13} strokeWidth={1.7} /></div>
                 <div className="alif-chat__bubble">

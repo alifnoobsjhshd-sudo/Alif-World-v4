@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
 const dotenv = require('dotenv');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI, ThinkingLevel } = require('@google/genai');
 
 try {
   dotenv.config({ path: '.env.local' });
@@ -164,7 +164,10 @@ function createChatApiApp() {
 
     try {
       const websiteUrl = getWebsiteUrl(req);
-      const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+      const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
+      const isLite = model.includes('lite');
+      const thinkingLevel = isLite ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW;
+
       const systemContext = [
         systemInstructions.trim(),
         ...(websiteUrl
@@ -204,22 +207,52 @@ function createChatApiApp() {
         contents.shift();
       }
 
-      const response = await ai.models.generateContent({
+      const stream = await ai.models.generateContentStream({
         model,
         contents,
         config: {
           systemInstruction: systemContext,
+          thinkingConfig: { thinkingLevel },
           maxOutputTokens: 900,
         },
       });
 
-      const reply = response.text ? response.text.trim() : '';
-      if (!reply) {
-        console.error('Gemini returned no assistant text.');
-        return res.status(502).json({ error: 'The assistant returned an empty reply. Please try again.' });
-      }
+      const wantsStream = req.body?.stream === true || (req.headers.accept && req.headers.accept.includes('text/event-stream'));
 
-      return res.json({ reply });
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        if (typeof res.flushHeaders === 'function') {
+          res.flushHeaders();
+        }
+
+        try {
+          for await (const chunk of stream) {
+            const text = chunk.text;
+            if (text) {
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          }
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        } catch (streamError) {
+          console.error('Error during SSE stream:', streamError?.message || streamError);
+          res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
+          return res.end();
+        }
+      } else {
+        let reply = '';
+        for await (const chunk of stream) {
+          reply += chunk.text || '';
+        }
+        reply = reply.trim();
+        if (!reply) {
+          console.error('Gemini returned no assistant text.');
+          return res.status(502).json({ error: 'The assistant returned an empty reply. Please try again.' });
+        }
+        return res.json({ reply });
+      }
     } catch (error) {
       console.error('Gemini request failed:', error?.message || error);
       const message = error?.message || '';
