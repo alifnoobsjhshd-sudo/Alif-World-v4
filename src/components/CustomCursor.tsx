@@ -21,6 +21,26 @@ export const CustomCursor: React.FC = () => {
   const [isHovering, setIsHovering] = useState(false);
   const [isClicking, setIsClicking] = useState(false);
 
+  // Responsive screen ratio tracking: outline is visible exclusively on desktop ratios
+  const [isDesktopRatio, setIsDesktopRatio] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 1024;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleScreenResize = () => {
+      setIsDesktopRatio(window.innerWidth >= 1024);
+    };
+    handleScreenResize();
+    window.addEventListener('resize', handleScreenResize, { passive: true });
+    window.addEventListener('orientationchange', handleScreenResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleScreenResize);
+      window.removeEventListener('orientationchange', handleScreenResize);
+    };
+  }, []);
+
   // Real mouse coordinates (instant, 0 delay)
   const mousePos = useRef({ x: -100, y: -100 });
   // Trailing delayed coordinates (smooth interpolated follow)
@@ -257,95 +277,98 @@ export const CustomCursor: React.FC = () => {
         ))}
 
       {/* ── 2. DELAYED TRAILING CIRCLE OUTLINE (CHASES MOUSE WITH FLUID DELAY) ── */}
-      <div
-        ref={ringRef}
-        className="fixed top-0 left-0 pointer-events-none will-change-transform"
-        style={{ transform: 'translate3d(-100px, -100px, 0)' }}
-      >
-        {/* 2A. LANDING: Warm Glass Glowing Ring */}
-        {isLanding && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-amber-300/80 bg-amber-400/10 backdrop-blur-[2.5px] shadow-[0_0_16px_rgba(251,191,36,0.35),inset_0_0_8px_rgba(255,255,255,0.2)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-14 h-14 border-amber-200 bg-amber-400/20 shadow-[0_0_24px_rgba(251,191,36,0.6)]'
-                : 'w-10 h-10'
-            }`}
-          >
-            <div className="w-1 h-1 rounded-full bg-amber-200/60" />
-          </div>
-        )}
+      {/* Exclusively visible for desktop screen ratio; strictly hidden for mobile screen ratio */}
+      {isDesktopRatio && (
+        <div
+          ref={ringRef}
+          className="fixed top-0 left-0 pointer-events-none will-change-transform hidden lg:block"
+          style={{ transform: 'translate3d(-100px, -100px, 0)' }}
+        >
+          {/* 2A. LANDING: Warm Glass Glowing Ring */}
+          {isLanding && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-amber-300/80 bg-amber-400/10 backdrop-blur-[2.5px] shadow-[0_0_16px_rgba(251,191,36,0.35),inset_0_0_8px_rgba(255,255,255,0.2)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-14 h-14 border-amber-200 bg-amber-400/20 shadow-[0_0_24px_rgba(251,191,36,0.6)]'
+                  : 'w-10 h-10'
+              }`}
+            >
+              <div className="w-1 h-1 rounded-full bg-amber-200/60" />
+            </div>
+          )}
 
-        {/* 2B. WORLD PAGE: Starlight Celestial Ring */}
-        {isWorld && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-purple-300/80 bg-purple-500/10 backdrop-blur-[2.5px] shadow-[0_0_18px_rgba(168,85,247,0.4),inset_0_0_8px_rgba(255,255,255,0.2)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-14 h-14 border-cyan-300 bg-cyan-400/20 shadow-[0_0_26px_rgba(6,182,212,0.55)]'
-                : 'w-10 h-10'
-            }`}
-          />
-        )}
+          {/* 2B. WORLD PAGE: Starlight Celestial Ring */}
+          {isWorld && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-purple-300/80 bg-purple-500/10 backdrop-blur-[2.5px] shadow-[0_0_18px_rgba(168,85,247,0.4),inset_0_0_8px_rgba(255,255,255,0.2)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-14 h-14 border-cyan-300 bg-cyan-400/20 shadow-[0_0_26px_rgba(6,182,212,0.55)]'
+                  : 'w-10 h-10'
+              }`}
+            />
+          )}
 
-        {/* 2C. JOURNEY PAGE: Dream Sky Blue Ring */}
-        {isJourney && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-300/85 bg-sky-400/15 backdrop-blur-[2.5px] shadow-[0_0_20px_rgba(56,189,248,0.45)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-14 h-14 bg-sky-400/25 border-white shadow-[0_0_28px_rgba(56,189,248,0.7)]'
-                : 'w-11 h-11'
-            }`}
-          />
-        )}
+          {/* 2C. JOURNEY PAGE: Dream Sky Blue Ring */}
+          {isJourney && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-300/85 bg-sky-400/15 backdrop-blur-[2.5px] shadow-[0_0_20px_rgba(56,189,248,0.45)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-14 h-14 bg-sky-400/25 border-white shadow-[0_0_28px_rgba(56,189,248,0.7)]'
+                  : 'w-11 h-11'
+              }`}
+            />
+          )}
 
-        {/* 2D. ABOUT ME PAGE: Oceanic Bubble Ring */}
-        {isAboutMe && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-300/85 bg-cyan-400/15 backdrop-blur-[3px] shadow-[0_0_20px_rgba(6,182,212,0.45),inset_0_0_8px_rgba(255,255,255,0.25)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-14 h-14 border-cyan-200 bg-cyan-300/25 shadow-[0_0_28px_rgba(6,182,212,0.7)]'
-                : 'w-10 h-10'
-            }`}
-          >
-            <div className="w-1.5 h-1.5 rounded-full bg-cyan-200/50" />
-          </div>
-        )}
+          {/* 2D. ABOUT ME PAGE: Oceanic Bubble Ring */}
+          {isAboutMe && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-300/85 bg-cyan-400/15 backdrop-blur-[3px] shadow-[0_0_20px_rgba(6,182,212,0.45),inset_0_0_8px_rgba(255,255,255,0.25)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-14 h-14 border-cyan-200 bg-cyan-300/25 shadow-[0_0_28px_rgba(6,182,212,0.7)]'
+                  : 'w-10 h-10'
+              }`}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-200/50" />
+            </div>
+          )}
 
-        {/* 2E. SPACE / COSMIC PAGE: Neon Cyan Ring */}
-        {isCosmic && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-400/85 bg-cyan-500/15 backdrop-blur-[2.5px] shadow-[0_0_22px_rgba(6,182,212,0.5)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-14 h-14 bg-cyan-400/25 border-white shadow-[0_0_30px_rgba(6,182,212,0.8)]'
-                : 'w-11 h-11'
-            }`}
-          />
-        )}
+          {/* 2E. SPACE / COSMIC PAGE: Neon Cyan Ring */}
+          {isCosmic && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-400/85 bg-cyan-500/15 backdrop-blur-[2.5px] shadow-[0_0_22px_rgba(6,182,212,0.5)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-14 h-14 bg-cyan-400/25 border-white shadow-[0_0_30px_rgba(6,182,212,0.8)]'
+                  : 'w-11 h-11'
+              }`}
+            />
+          )}
 
-        {/* 2F. CHAT, PROJECTS & OTHER PAGES: Crisp Dual-Tone Ring Visible on Light and Dark */}
-        {!isLanding && !isWorld && !isJourney && !isAboutMe && !isCosmic && (
-          <div
-            className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-500/70 bg-sky-500/10 backdrop-blur-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.75),0_0_14px_rgba(56,189,248,0.35)] ${
-              isClicking
-                ? 'w-8 h-8 scale-90'
-                : isHovering
-                ? 'w-13 h-13 border-sky-400 bg-sky-400/20 shadow-[0_0_0_1.5px_rgba(255,255,255,0.95),0_0_22px_rgba(56,189,248,0.55)]'
-                : 'w-10 h-10'
-            }`}
-          >
-            <div className="w-1 h-1 rounded-full bg-sky-500/40" />
-          </div>
-        )}
-      </div>
+          {/* 2F. CHAT, PROJECTS & OTHER PAGES: Crisp Dual-Tone Ring Visible on Light and Dark */}
+          {!isLanding && !isWorld && !isJourney && !isAboutMe && !isCosmic && (
+            <div
+              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-500/70 bg-sky-500/10 backdrop-blur-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.75),0_0_14px_rgba(56,189,248,0.35)] ${
+                isClicking
+                  ? 'w-8 h-8 scale-90'
+                  : isHovering
+                  ? 'w-13 h-13 border-sky-400 bg-sky-400/20 shadow-[0_0_0_1.5px_rgba(255,255,255,0.95),0_0_22px_rgba(56,189,248,0.55)]'
+                  : 'w-10 h-10'
+              }`}
+            >
+              <div className="w-1 h-1 rounded-full bg-sky-500/40" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 3. IMMEDIATE CURSOR POINT / THEMED ICONS (FOLLOWS MOUSE WITH 0 DELAY) ── */}
       <div
