@@ -81,6 +81,57 @@ function extractAssistantText(responseBody) {
     .trim();
 }
 
+function normalizeWebsiteUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+
+  try {
+    const candidate = value.trim();
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(candidate) ? candidate : `https://${candidate}`);
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function getWebsiteUrl(req) {
+  const configuredUrl = [
+    process.env.PUBLIC_SITE_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.RENDER_EXTERNAL_HOSTNAME,
+  ]
+    .map(normalizeWebsiteUrl)
+    .find(Boolean);
+
+  if (configuredUrl) return configuredUrl;
+  return normalizeWebsiteUrl(`${req.protocol}://${req.get('host')}`);
+}
+
+function safeProviderErrorDetails(responseBody) {
+  const providerError = responseBody?.error;
+  const safeValue = (value) => (
+    typeof value === 'string' && /^[a-z\d_.:-]{1,80}$/i.test(value)
+      ? value
+      : null
+  );
+
+  return {
+    type: safeValue(providerError?.type),
+    code: safeValue(providerError?.code),
+    param: safeValue(providerError?.param),
+  };
+}
+
+function getProviderFailureMessage(status) {
+  if (status === 400) return 'Grok rejected the chat request. Check the model and API request settings.';
+  if (status === 401 || status === 403) return 'Grok rejected this service’s API key or account. Check AI_API in the service environment.';
+  if (status === 404) return 'The configured Grok API endpoint or model was not found.';
+  if (status === 429) return 'Grok is rate-limited or the account has no available quota. Please try again later.';
+  return 'The assistant could not answer just now. Please try again.';
+}
+
 function createChatApiApp() {
   const api = express();
   api.set('trust proxy', 1);
@@ -112,6 +163,7 @@ function createChatApiApp() {
     }
 
     try {
+      const websiteUrl = getWebsiteUrl(req);
       const grokResponse = await fetch('https://api.x.ai/v1/responses', {
         method: 'POST',
         headers: {
@@ -122,6 +174,16 @@ function createChatApiApp() {
           model: 'grok-4.7',
           input: [
             { role: 'system', content: systemInstructions },
+            ...(websiteUrl
+              ? [{
+                  role: 'system',
+                  content: [
+                    `Current portfolio website URL: ${websiteUrl}`,
+                    'When asked for the portfolio URL, use this exact runtime URL rather than any older domain written in the knowledge file.',
+                    'Only append a page path when that route has been verified.',
+                  ].join('\n'),
+                }]
+              : []),
             ...conversation.messages,
           ],
           max_output_tokens: 900,
@@ -132,8 +194,13 @@ function createChatApiApp() {
 
       const responseBody = await grokResponse.json().catch(() => null);
       if (!grokResponse.ok) {
-        console.error(`Grok request failed with status ${grokResponse.status}.`);
-        return res.status(502).json({ error: 'The assistant could not answer just now. Please try again.' });
+        const details = safeProviderErrorDetails(responseBody);
+        const diagnostic = Object.entries(details)
+          .filter(([, value]) => value)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(' ');
+        console.error(`Grok request failed with status ${grokResponse.status}${diagnostic ? ` (${diagnostic})` : ''}.`);
+        return res.status(502).json({ error: getProviderFailureMessage(grokResponse.status) });
       }
 
       const reply = extractAssistantText(responseBody);
