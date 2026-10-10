@@ -15,6 +15,9 @@ export default defineConfig(({mode}) => {
   if (!process.env.AI_API && env.AI_API) {
     process.env.AI_API = env.AI_API;
   }
+  if (!process.env.GEMINI_MODEL && env.GEMINI_MODEL) {
+    process.env.GEMINI_MODEL = env.GEMINI_MODEL;
+  }
   const virtualCursorEnabled = [env.CURSER, env.VITE_CURSER].some(
     (value) => value?.trim().toLowerCase() === 'true',
   );
@@ -30,7 +33,6 @@ export default defineConfig(({mode}) => {
       },
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.CURSER': JSON.stringify(String(virtualCursorEnabled)),
     },
     resolve: {

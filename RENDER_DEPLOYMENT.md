@@ -1,12 +1,12 @@
 # Complete Deployment Guide for Render (render.com)
 
-This guide deploys the **Alif-World Portfolio** on [Render](https://render.com) as one Node Web Service. The Express server serves the built portfolio and the private Grok chatbot API from the same service.
+This guide deploys the **Alif-World Portfolio** on [Render](https://render.com) as one Node Web Service. The Express server serves the built portfolio and the private Gemini chatbot API from the same service.
 
 ---
 
 ## Why a Node Web Service?
 
-- The app needs a server-side `/api/chat` route so the Grok API key is never sent to visitors' browsers.
+- The app needs a server-side `/api/chat` route so the Gemini API key is never sent to visitors' browsers.
 - The existing Express server serves both the built frontend and chatbot API; no separate API service is required.
 - A Render Static Site cannot run the API route. The existing Render service must be changed to a Node Web Service.
 - Replit secrets are separate from Render environment variables. Add `AI_API` to the Render service before testing live chat.
@@ -25,7 +25,7 @@ The repository already includes a pre-configured `render.yaml` file.
    - **Start Command**: `npm start`
    - **Health Check Path**: `/api/health`
 4. Review every proposed change before applying it. A Static Site cannot run the chatbot API; if Render cannot safely update the existing resource, create a separate Web Service and keep the old site until the new one is verified.
-5. In the new service's **Environment** settings, add `AI_API` with the Grok API key. `render.yaml` uses `sync: false`, so Render will not read a key from the repository. If Render prompts for it during Blueprint setup, enter it there instead.
+5. In the new service's **Environment** settings, add `AI_API` with the Gemini API key. `render.yaml` uses `sync: false`, so Render will not read a key from the repository. If Render prompts for it during Blueprint setup, enter it there instead.
 
 ---
 
@@ -66,9 +66,9 @@ Enter the following exact configuration:
 The chatbot's API key must stay on the server. Do not add it to Vite, `VITE_*` variables, or frontend code.
 
 In the Render Web Service's **Environment** settings:
-1. Add `AI_API` and enter the Grok API key there.
+1. Add `AI_API` and enter the Gemini API key there.
 2. Keep the key in Render's server-side environment only. Do not add it to a `VITE_*` variable, client-side code, or source control.
-3. Save the variable. Grok usage and any related charges are associated with the xAI account for that key.
+3. Save the variable. Gemini usage and any related charges are associated with the Google account for that key.
 
 The Express server already handles SPA routes such as `/projects`, `/journey`, and `/chat`; do not add a catch-all Render rewrite that could intercept `/api/chat`.
 
@@ -85,7 +85,7 @@ The Express server already handles SPA routes such as `/projects`, `/journey`, a
    - Open `/chat`, send a message, and confirm the assistant replies.
 4. If chat reports that the assistant is not configured, check that `AI_API` is saved in this Web Service's Environment settings, then redeploy.
 
-The site keeps the conversation in page memory and sends only the latest 20 messages with each request. The API does not write visitor messages to a database or logs and sets `store: false` on xAI requests. Do not send passwords, API keys, or other sensitive information in chat.
+The site keeps the conversation in page memory and sends only the latest 20 conversation messages with each request. The API does not persist visitor messages to a database or application logs. Do not send passwords, API keys, or other sensitive information in chat.
 
 ---
 

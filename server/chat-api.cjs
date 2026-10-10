@@ -71,11 +71,8 @@ function getConversationMessages(messages) {
 }
 
 function extractAssistantText(responseBody) {
-  return (responseBody?.output ?? [])
-    .filter((item) => item?.role === 'assistant' || item?.type === 'message')
-    .flatMap((item) => item?.content ?? [])
-    .filter((item) => item?.type === 'output_text' || item?.type === 'refusal')
-    .map((item) => item.text || item.refusal || '')
+  return (responseBody?.candidates?.[0]?.content?.parts ?? [])
+    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
     .filter(Boolean)
     .join('\n')
     .trim();
@@ -120,17 +117,18 @@ function safeProviderErrorDetails(responseBody) {
   );
 
   return {
+    code: Number.isInteger(providerError?.code) ? String(providerError.code) : safeValue(providerError?.code),
+    status: safeValue(providerError?.status),
     type: safeValue(providerError?.type),
-    code: safeValue(providerError?.code),
     param: safeValue(providerError?.param),
   };
 }
 
 function getProviderFailureMessage(status) {
-  if (status === 400) return 'Grok rejected the chat request. Check the model and API request settings.';
-  if (status === 401 || status === 403) return 'Grok rejected this service’s API key or account. Check AI_API in the service environment.';
-  if (status === 404) return 'The configured Grok API endpoint or model was not found.';
-  if (status === 429) return 'Grok is rate-limited or the account has no available quota. Please try again later.';
+  if (status === 400) return 'Gemini rejected the chat request. Check the model and message format.';
+  if (status === 401 || status === 403) return 'Gemini rejected AI_API. Check that it is a valid Gemini API key with API access enabled.';
+  if (status === 404) return 'The configured Gemini model was not found. Check GEMINI_MODEL or use gemini-3.8-flash.';
+  if (status === 429) return 'Gemini is rate-limited or the account has no available quota. Please try again later.';
   return 'The assistant could not answer just now. Please try again.';
 }
 
@@ -166,48 +164,53 @@ function createChatApiApp() {
 
     try {
       const websiteUrl = getWebsiteUrl(req);
-      const grokResponse = await fetch('https://api.x.ai/v1/responses', {
+      const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
+      const systemContext = [
+        systemInstructions.trim(),
+        ...(websiteUrl
+          ? [[
+              `Authoritative current portfolio website URL for this request: ${websiteUrl}`,
+              'This URL is the live website address for the current environment. When asked for the portfolio or website URL, give this exact address; do not use any older URL from background instructions.',
+              'Only append a page path when that route has been verified.',
+            ].join('\n')]
+          : []),
+      ].join('\n\n');
+
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          'x-goog-api-key': apiKey,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'grok-4.7',
-          input: [
-            { role: 'system', content: systemInstructions },
-            ...(websiteUrl
-              ? [{
-                  role: 'system',
-                  content: [
-                    `Authoritative current portfolio website URL for this request: ${websiteUrl}`,
-                    'This URL is the live website address for the current environment. When asked for the portfolio or website URL, give this exact address; do not use any older URL from background instructions.',
-                    'Only append a page path when that route has been verified.',
-                  ].join('\n'),
-                }]
-              : []),
-            ...conversation.messages,
-          ],
-          max_output_tokens: 900,
+          systemInstruction: { parts: [{ text: systemContext }] },
+          contents: conversation.messages.map((message) => ({
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: message.content }],
+          })),
+          generationConfig: { maxOutputTokens: 900 },
           store: false,
         }),
         signal: AbortSignal.timeout(90_000),
-      });
+        },
+      );
 
-      const responseBody = await grokResponse.json().catch(() => null);
-      if (!grokResponse.ok) {
+      const responseBody = await geminiResponse.json().catch(() => null);
+      if (!geminiResponse.ok) {
         const details = safeProviderErrorDetails(responseBody);
         const diagnostic = Object.entries(details)
           .filter(([, value]) => value)
           .map(([key, value]) => `${key}=${value}`)
           .join(' ');
-        console.error(`Grok request failed with status ${grokResponse.status}${diagnostic ? ` (${diagnostic})` : ''}.`);
-        return res.status(502).json({ error: getProviderFailureMessage(grokResponse.status) });
+        console.error(`Gemini request failed with status ${geminiResponse.status}${diagnostic ? ` (${diagnostic})` : ''}.`);
+        return res.status(502).json({ error: getProviderFailureMessage(geminiResponse.status) });
       }
 
       const reply = extractAssistantText(responseBody);
       if (!reply) {
-        console.error('Grok returned no assistant text.');
+        console.error('Gemini returned no assistant text.');
         return res.status(502).json({ error: 'The assistant returned an empty reply. Please try again.' });
       }
 
@@ -216,7 +219,7 @@ function createChatApiApp() {
       const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError'
         ? 'timed out'
         : 'failed';
-      console.error(`Grok request ${reason}.`);
+      console.error(`Gemini request ${reason}.`);
       return res.status(502).json({ error: 'The assistant is temporarily unavailable. Please try again.' });
     }
   });

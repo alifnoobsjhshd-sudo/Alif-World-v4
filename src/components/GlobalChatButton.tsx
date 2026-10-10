@@ -10,14 +10,18 @@ const ROUTES_WITH_PAGE_BACK = new Set([
   '/explore-work',
   '/not-available',
   '/unavailable',
+  '/about',
+  '/about-me',
+  '/more-about-him',
   '/chat',
 ]);
 
 export const GlobalChatButton: React.FC = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const isLanding = pathname === '/';
-  const needsGlobalBack = !isLanding && !ROUTES_WITH_PAGE_BACK.has(pathname);
+  const routePath = pathname.replace(/\/+$/, '') || '/';
+  const isLanding = routePath === '/';
+  const needsGlobalBack = !isLanding && !ROUTES_WITH_PAGE_BACK.has(routePath);
 
   const handleBack = () => {
     if (window.history.state?.idx > 0) {

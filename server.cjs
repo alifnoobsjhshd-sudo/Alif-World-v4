@@ -9,7 +9,7 @@ const DIST_DIR = path.join(__dirname, 'dist');
 
 app.set('trust proxy', 1);
 
-// The same server handles Grok requests and serves the compiled SPA.
+// The same server handles Gemini requests and serves the compiled SPA.
 app.use(createChatApiApp());
 
 // Health check endpoint

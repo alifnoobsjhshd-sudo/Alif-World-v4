@@ -53,7 +53,8 @@ export default function ChatbotPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history.slice(-20) }),
+        // The opening assistant greeting is presentation-only, not a model turn.
+        body: JSON.stringify({ messages: history.slice(1).slice(-20) }),
         signal: controller.signal,
       });
 

@@ -8,7 +8,6 @@ import { CartoonCloudTransition } from '../components/CartoonCloudTransition';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { LetsDriveButton } from '../components/LetsDriveButton';
 import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
-import { CursorBackgroundBlurLens } from '../components/CursorBackgroundBlurLens';
 import landingBgUser from '../assets/images/landing_bg_user.jpg';
 import landingBgMobile from '../assets/images/landing_bg_mobile.jpg';
 
@@ -251,9 +250,6 @@ export const LandingPage: React.FC = () => {
                 ease: 'easeInOut',
               }}
             />
-
-            {/* Localized Cursor Blur Lens (Blurs only background image within distance) */}
-            <CursorBackgroundBlurLens />
 
             {/* ── MIDGROUND LAYER: WARM LAMP GLOW, DUST MOTES ── */}
             <div 
