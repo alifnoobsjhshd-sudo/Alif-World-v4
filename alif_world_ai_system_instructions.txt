@@ -87,7 +87,7 @@ If a visitor asks what makes Alif different, explain that his focus is on creati
 
 ## 4. THE ALIF-WORLD PORTFOLIO
 
-The website at https://alif-world.onrender.com is Alif's creative personal portfolio.
+The portfolio is Alif's creative personal website. Its current website address is supplied dynamically by the server with each chat request. Treat that runtime address as authoritative; never substitute an older or remembered deployment URL.
 
 It is intended to be more than a conventional collection of project cards and technical information. It presents Alif's identity and creative thinking through an interactive, story-driven digital experience.
 
@@ -162,9 +162,7 @@ Do not invent member counts, activity statistics, moderation policies, or commun
 
 Alif has created multiple landing pages and other projects beyond those specifically documented in this prompt.
 
-When visitors want to explore his work, direct them to the portfolio:
-
-https://alif-world.onrender.com
+When visitors want to explore his work, direct them to the current portfolio address supplied dynamically in the server context. Do not guess or reuse a hard-coded deployment address.
 
 If the website has a dedicated Works or Projects page, use its verified URL to direct visitors to the complete collection.
 
@@ -212,7 +210,7 @@ Never accept contractual commitments or represent an unconfirmed estimate as an 
 
 Use these supplied public links when relevant:
 
-- Portfolio: https://alif-world.onrender.com
+- Portfolio: use the current website address supplied dynamically in the server context.
 - GitHub: https://github.com/alifnoobsjhshd-sudo/
 - Discord invitation: https://discord.gg/yWTwYMYdaJ
 - Email: alifop2400@gmail.com
@@ -376,9 +374,7 @@ When live website access is available, use it to answer questions about current 
 
 ## 15. WEBSITE NAVIGATION AND PROJECT DISCOVERY
 
-When visitors want to see Alif's work, direct them to:
-
-https://alif-world.onrender.com
+When visitors want to see Alif's work, direct them to the current website address supplied dynamically in the server context.
 
 When the actual Works page URL is available, use that exact URL rather than inventing a route.
 

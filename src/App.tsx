@@ -38,6 +38,7 @@ import { dreamAudio } from './utils/audio';
 import { CustomCursor } from './components/CustomCursor';
 import { VirtualCursorPad } from './components/VirtualCursorPad';
 import { GlobalChatButton } from './components/GlobalChatButton';
+import { CursorBackgroundBlurLens } from './components/CursorBackgroundBlurLens';
 
 const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
 
@@ -417,6 +418,7 @@ export default function App() {
   return (
     <>
       <CustomCursor />
+      <CursorBackgroundBlurLens />
       <VirtualCursorPad />
       <GlobalChatButton />
       <AnimatePresence>

@@ -374,10 +374,6 @@ export const VirtualCursorPad: React.FC = () => {
               )}
             </AnimatePresence>
 
-            {/* Target Reticle Coordinates Tag */}
-            <div className="absolute top-5 left-4 whitespace-nowrap px-1.5 py-0.5 rounded bg-slate-950/90 border border-cyan-500/50 text-[10px] font-mono text-cyan-200 shadow-md pointer-events-none backdrop-blur-md">
-              {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
-            </div>
           </div>
         </div>
       )}

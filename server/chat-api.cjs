@@ -97,6 +97,9 @@ function normalizeWebsiteUrl(value) {
 }
 
 function getWebsiteUrl(req) {
+  const requestOrigin = normalizeWebsiteUrl(`${req.protocol}://${req.get('host') || ''}`);
+  if (requestOrigin) return requestOrigin;
+
   const configuredUrl = [
     process.env.PUBLIC_SITE_URL,
     process.env.RENDER_EXTERNAL_URL,
@@ -105,8 +108,7 @@ function getWebsiteUrl(req) {
     .map(normalizeWebsiteUrl)
     .find(Boolean);
 
-  if (configuredUrl) return configuredUrl;
-  return normalizeWebsiteUrl(`${req.protocol}://${req.get('host')}`);
+  return configuredUrl || null;
 }
 
 function safeProviderErrorDetails(responseBody) {
@@ -178,8 +180,8 @@ function createChatApiApp() {
               ? [{
                   role: 'system',
                   content: [
-                    `Current portfolio website URL: ${websiteUrl}`,
-                    'When asked for the portfolio URL, use this exact runtime URL rather than any older domain written in the knowledge file.',
+                    `Authoritative current portfolio website URL for this request: ${websiteUrl}`,
+                    'This URL is the live website address for the current environment. When asked for the portfolio or website URL, give this exact address; do not use any older URL from background instructions.',
                     'Only append a page path when that route has been verified.',
                   ].join('\n'),
                 }]

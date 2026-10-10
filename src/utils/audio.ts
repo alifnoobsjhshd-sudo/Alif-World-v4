@@ -3020,7 +3020,7 @@ class SkyAudioPlayer {
   // ── CONTINUOUS SCROLLING BUBBLE SOUND STREAM ──────────────────────────────
   // Naturally streams organic, soft water bubbles for as long as user is scrolling
   private isScrollBubbling = false;
-  private scrollBubbleStopTimeout: ReturnType<typeof setTimeout> | null = null;
+  private scrollBubbleStopTimeout: number | ReturnType<typeof setTimeout> | null = null;
   private bubbleLoopAudioElement: HTMLAudioElement | null = null;
   private bubbleLoopFadeInterval: number | null = null;
   private bubbleOneShotPool: HTMLAudioElement[] = [];
@@ -3192,7 +3192,7 @@ class SkyAudioPlayer {
       }, 80);
     } else {
       if (this.isScrollBubbling && !this.scrollBubbleStopTimeout) {
-        this.scrollBubbleStopTimeout = setTimeout(() => {
+        this.scrollBubbleStopTimeout = window.setTimeout(() => {
           this.stopScrollingBubbleSound();
         }, 80);
       }
