@@ -1,16 +1,42 @@
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
+const dotenv = require('dotenv');
+const { GoogleGenAI } = require('@google/genai');
+
+try {
+  dotenv.config({ path: '.env.local' });
+  dotenv.config();
+} catch {}
 
 const instructionsPath = path.join(__dirname, '..', 'alif_world_ai_system_instructions.txt');
-const systemInstructions = fs.readFileSync(instructionsPath, 'utf8');
+let systemInstructions = '';
+try {
+  systemInstructions = fs.readFileSync(instructionsPath, 'utf8');
+} catch (e) {
+  console.warn('Could not read system instructions file:', e.message);
+}
+
 const rateLimitBuckets = new Map();
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_REQUESTS = 12;
+const RATE_LIMIT_REQUESTS = 24;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_LENGTH = 4_000;
 const MAX_HISTORY_LENGTH = 18_000;
+
+function getApiKey() {
+  const candidate = process.env.AI_API || process.env.GEMINI_API_KEY;
+  if (!candidate || typeof candidate !== 'string') return '';
+  return candidate.trim().replace(/^["']|["']$/g, '').trim();
+}
+
+// Keep both environment variables synchronized
+const resolvedKey = getApiKey();
+if (resolvedKey) {
+  if (!process.env.AI_API) process.env.AI_API = resolvedKey;
+  if (!process.env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = resolvedKey;
+}
 
 function consumeRateLimit(clientId) {
   const now = Date.now();
@@ -70,14 +96,6 @@ function getConversationMessages(messages) {
   return { messages: normalized };
 }
 
-function extractAssistantText(responseBody) {
-  return (responseBody?.candidates?.[0]?.content?.parts ?? [])
-    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-}
-
 function normalizeWebsiteUrl(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
 
@@ -101,6 +119,7 @@ function getWebsiteUrl(req) {
     process.env.PUBLIC_SITE_URL,
     process.env.RENDER_EXTERNAL_URL,
     process.env.RENDER_EXTERNAL_HOSTNAME,
+    process.env.APP_URL,
   ]
     .map(normalizeWebsiteUrl)
     .find(Boolean);
@@ -108,33 +127,14 @@ function getWebsiteUrl(req) {
   return configuredUrl || null;
 }
 
-function safeProviderErrorDetails(responseBody) {
-  const providerError = responseBody?.error;
-  const safeValue = (value) => (
-    typeof value === 'string' && /^[a-z\d_.:-]{1,80}$/i.test(value)
-      ? value
-      : null
-  );
-
-  return {
-    code: Number.isInteger(providerError?.code) ? String(providerError.code) : safeValue(providerError?.code),
-    status: safeValue(providerError?.status),
-    type: safeValue(providerError?.type),
-    param: safeValue(providerError?.param),
-  };
-}
-
-function getProviderFailureMessage(status) {
-  if (status === 400) return 'Gemini rejected the chat request. Check the model and message format.';
-  if (status === 401 || status === 403) return 'Gemini rejected AI_API. Check that it is a valid Gemini API key with API access enabled.';
-  if (status === 404) return 'The configured Gemini model was not found. Check GEMINI_MODEL or use gemini-3.8-flash.';
-  if (status === 429) return 'Gemini is rate-limited or the account has no available quota. Please try again later.';
-  return 'The assistant could not answer just now. Please try again.';
-}
-
 function createChatApiApp() {
   const api = express();
   api.set('trust proxy', 1);
+
+  // Health check endpoint accessible under /api/health
+  api.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
 
   api.use('/api/chat', (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -157,9 +157,9 @@ function createChatApiApp() {
       return res.status(400).json({ error: conversation.error });
     }
 
-    const apiKey = process.env.AI_API?.trim();
+    const apiKey = getApiKey();
     if (!apiKey) {
-      return res.status(503).json({ error: 'The assistant is not configured on this server yet.' });
+      return res.status(503).json({ error: 'The assistant is not configured on this server yet. Please ensure AI_API or GEMINI_API_KEY is set.' });
     }
 
     try {
@@ -176,39 +176,44 @@ function createChatApiApp() {
           : []),
       ].join('\n\n');
 
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-        method: 'POST',
-        headers: {
-          'x-goog-api-key': apiKey,
-          'Content-Type': 'application/json',
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
         },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemContext }] },
-          contents: conversation.messages.map((message) => ({
-            role: message.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: message.content }],
-          })),
-          generationConfig: { maxOutputTokens: 900 },
-          store: false,
-        }),
-        signal: AbortSignal.timeout(90_000),
-        },
-      );
+      });
 
-      const responseBody = await geminiResponse.json().catch(() => null);
-      if (!geminiResponse.ok) {
-        const details = safeProviderErrorDetails(responseBody);
-        const diagnostic = Object.entries(details)
-          .filter(([, value]) => value)
-          .map(([key, value]) => `${key}=${value}`)
-          .join(' ');
-        console.error(`Gemini request failed with status ${geminiResponse.status}${diagnostic ? ` (${diagnostic})` : ''}.`);
-        return res.status(502).json({ error: getProviderFailureMessage(geminiResponse.status) });
+      // Prepare turn sequence, ensuring alternation between user and model
+      const contents = [];
+      for (const message of conversation.messages) {
+        const role = message.role === 'assistant' ? 'model' : 'user';
+        if (contents.length > 0 && contents[contents.length - 1].role === role) {
+          contents[contents.length - 1].parts[0].text += '\n\n' + message.content;
+        } else {
+          contents.push({
+            role,
+            parts: [{ text: message.content }],
+          });
+        }
       }
 
-      const reply = extractAssistantText(responseBody);
+      // Ensure first message is from user
+      if (contents.length > 0 && contents[0].role !== 'user') {
+        contents.shift();
+      }
+
+      const response = await ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          systemInstruction: systemContext,
+          maxOutputTokens: 900,
+        },
+      });
+
+      const reply = response.text ? response.text.trim() : '';
       if (!reply) {
         console.error('Gemini returned no assistant text.');
         return res.status(502).json({ error: 'The assistant returned an empty reply. Please try again.' });
@@ -216,10 +221,14 @@ function createChatApiApp() {
 
       return res.json({ reply });
     } catch (error) {
-      const reason = error?.name === 'TimeoutError' || error?.name === 'AbortError'
-        ? 'timed out'
-        : 'failed';
-      console.error(`Gemini request ${reason}.`);
+      console.error('Gemini request failed:', error?.message || error);
+      const message = error?.message || '';
+      if (message.includes('API_KEY_INVALID') || message.includes('API key not valid')) {
+        return res.status(401).json({ error: 'Gemini rejected the API key. Please check that AI_API is valid.' });
+      }
+      if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+        return res.status(429).json({ error: 'Gemini quota or rate limit exceeded. Please try again later.' });
+      }
       return res.status(502).json({ error: 'The assistant is temporarily unavailable. Please try again.' });
     }
   });

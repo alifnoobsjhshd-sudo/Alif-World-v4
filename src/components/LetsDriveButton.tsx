@@ -113,14 +113,14 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative inline-flex items-center justify-center p-[2.5px] rounded-2xl sm:rounded-3xl select-none group transition-shadow duration-200 pointer-events-auto ${className}`}
+      className={`relative inline-flex items-center justify-center p-[2.5px] lg:p-[4.5px] rounded-2xl sm:rounded-3xl lg:rounded-[32px] select-none group transition-shadow duration-200 pointer-events-auto ${className}`}
       style={{
         background: outlineGradient,
       }}
     >
       {/* ── 1. AMBIENT SOFT DIRECTIONAL GLOW (Casts emerald light facing the cursor) ── */}
       <div
-        className="absolute -inset-[3.5px] rounded-2xl sm:rounded-3xl pointer-events-none filter blur-[8px] transition-opacity duration-150"
+        className="absolute -inset-[3.5px] lg:-inset-[5.5px] rounded-2xl sm:rounded-3xl lg:rounded-[32px] pointer-events-none filter blur-[8px] lg:blur-[12px] transition-opacity duration-150"
         style={{
           background: ambientGlow,
           opacity: isHovered ? 0.95 : Math.max(0.4, 0.35 + proximityFactor * 0.6),
@@ -141,7 +141,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
         }}
         whileTap={{ scale: 1 }}
         whileHover={{ scale: 1 }}
-        className="relative w-56 xs:w-64 sm:w-72 md:w-76 lg:w-80 h-12 sm:h-14 rounded-[calc(1rem-2.5px)] sm:rounded-[calc(1.5rem-2.5px)] bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white font-display font-black tracking-wider uppercase text-xs xs:text-sm sm:text-base lg:text-lg flex items-center justify-center gap-2.5 overflow-hidden cursor-pointer shadow-[0_10px_28px_rgba(16,185,129,0.32)] active:shadow-sm select-none"
+        className="relative w-56 xs:w-64 sm:w-72 md:w-76 lg:w-[356px] h-12 sm:h-14 lg:h-[64px] rounded-[calc(1rem-2.5px)] sm:rounded-[calc(1.5rem-2.5px)] lg:rounded-[calc(2rem-4.5px)] bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white font-display font-black tracking-wider uppercase text-xs xs:text-sm sm:text-base lg:text-[19px] flex items-center justify-center gap-2.5 lg:gap-3.5 overflow-hidden cursor-pointer shadow-[0_10px_28px_rgba(16,185,129,0.32)] active:shadow-sm select-none"
       >
         {/* Specular Liquid Wave Shimmer */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ borderRadius: 'inherit' }}>
@@ -155,7 +155,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
               ease: [0.4, 0, 0.2, 1],
               repeatDelay: 1.5,
             }}
-            className="absolute inset-y-0 w-28 -skew-x-12 pointer-events-none opacity-45 bg-gradient-to-r from-transparent via-white to-transparent"
+            className="absolute inset-y-0 w-28 lg:w-36 -skew-x-12 pointer-events-none opacity-45 bg-gradient-to-r from-transparent via-white to-transparent"
           />
         </div>
 
@@ -166,11 +166,11 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
         />
 
         {/* Button Content */}
-        <Compass className="w-5 h-5 text-emerald-100 group-hover:rotate-45 transition-transform duration-500 shrink-0 drop-shadow" />
+        <Compass className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-emerald-100 group-hover:rotate-45 transition-transform duration-500 shrink-0 drop-shadow" />
         <span className="drop-shadow-md whitespace-nowrap">
           LET'S DRIVE
         </span>
-        <Sparkles className="w-4 h-4 text-amber-200 shrink-0 animate-pulse drop-shadow" />
+        <Sparkles className="w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 text-amber-200 shrink-0 animate-pulse drop-shadow" />
       </motion.button>
     </div>
   );

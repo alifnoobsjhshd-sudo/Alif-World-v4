@@ -12,8 +12,10 @@ export default defineConfig(({mode}) => {
   // Vite's .env.local values are not automatically copied into process.env.
   // The chat endpoint runs only in this Node dev server, so load its key here
   // without defining or exposing it to the browser bundle.
-  if (!process.env.AI_API && env.AI_API) {
-    process.env.AI_API = env.AI_API;
+  const resolvedKey = env.AI_API || env.GEMINI_API_KEY || process.env.AI_API || process.env.GEMINI_API_KEY;
+  if (resolvedKey) {
+    if (!process.env.AI_API) process.env.AI_API = resolvedKey;
+    if (!process.env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = resolvedKey;
   }
   if (!process.env.GEMINI_MODEL && env.GEMINI_MODEL) {
     process.env.GEMINI_MODEL = env.GEMINI_MODEL;

@@ -3278,6 +3278,157 @@ class SkyAudioPlayer {
       noise.stop(now + duration + 0.1);
     } catch {}
   }
+  // ── PAGE THEMED CLICK EFFECT SOUNDS ──────────────────────────────────────
+  // 1. World Page: Celestial chime & airy crystal ring resonance
+  public playWorldClickSound(panX: number = 0): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // High harmonic crystal bell stack (C6 1046Hz, G6 1568Hz, E7 2637Hz)
+      const freqs = [1046.5, 1567.98, 2637.02];
+      const gains = [0.045, 0.032, 0.022];
+
+      freqs.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(gains[idx], now + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38 + idx * 0.1);
+
+        if (typeof this.ctx.createStereoPanner === 'function') {
+          const panner = this.ctx.createStereoPanner();
+          panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, panX)), now);
+          osc.connect(gain);
+          gain.connect(panner);
+          panner.connect(this.ctx.destination);
+        } else {
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+        }
+
+        osc.start(now);
+        osc.stop(now + 0.55);
+      });
+
+      // Soft high airy wind shimmer trail
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.getNoiseBuffer(this.ctx);
+      const bFilter = this.ctx.createBiquadFilter();
+      bFilter.type = 'bandpass';
+      bFilter.frequency.setValueAtTime(3200, now);
+      bFilter.Q.setValueAtTime(3.5, now);
+
+      const bGain = this.ctx.createGain();
+      bGain.gain.setValueAtTime(0.0001, now);
+      bGain.gain.linearRampToValueAtTime(0.018, now + 0.015);
+      bGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+      noise.connect(bFilter);
+      bFilter.connect(bGain);
+      bGain.connect(this.ctx.destination);
+      noise.start(now);
+      noise.stop(now + 0.3);
+    } catch {}
+  }
+
+  // 2. The Story Page: Whimsical storybook pop & pleasant music-box paper tap
+  public playStoryClickSound(panX: number = 0): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Acoustic wooden/paper pluck + warm storybook celesta chime
+      const osc = this.ctx.createOscillator();
+      const oscHarmonic = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.04); // E5
+
+      oscHarmonic.type = 'sine';
+      oscHarmonic.frequency.setValueAtTime(1046.5, now); // C6 chime sparkle
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(2800, now);
+      filter.Q.setValueAtTime(1.8, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.065, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+      osc.connect(filter);
+      oscHarmonic.connect(filter);
+      filter.connect(gain);
+
+      if (typeof this.ctx.createStereoPanner === 'function') {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, panX)), now);
+        gain.connect(panner);
+        panner.connect(this.ctx.destination);
+      } else {
+        gain.connect(this.ctx.destination);
+      }
+
+      osc.start(now);
+      oscHarmonic.start(now);
+      osc.stop(now + 0.24);
+      oscHarmonic.stop(now + 0.24);
+    } catch {}
+  }
+
+  // 3. About Me Page: Juicy playful iridescent bubble pop (aquatic bloop sweep)
+  public playAboutBubbleClickSound(panX: number = 0): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      // Pitch sweep: fast upward spring sweep 480Hz -> 890Hz with slight randomize
+      const baseFreq = 480 + (Math.random() - 0.5) * 60;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(baseFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.85, now + 0.038);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1100, now);
+      filter.Q.setValueAtTime(2.2, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+      osc.connect(filter);
+      filter.connect(gain);
+
+      if (typeof this.ctx.createStereoPanner === 'function') {
+        const panner = this.ctx.createStereoPanner();
+        panner.pan.setValueAtTime(Math.max(-0.7, Math.min(0.7, panX)), now);
+        gain.connect(panner);
+        panner.connect(this.ctx.destination);
+      } else {
+        gain.connect(this.ctx.destination);
+      }
+
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } catch {}
+  }
 }
 
 export const dreamAudio = new SkyAudioPlayer();

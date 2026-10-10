@@ -1,6 +1,13 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const dotenv = require('dotenv');
+
+try {
+  dotenv.config({ path: '.env.local' });
+  dotenv.config();
+} catch {}
+
 const { createChatApiApp } = require('./server/chat-api.cjs');
 
 const app = express();
