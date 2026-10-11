@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, animate, MotionValue } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { STORY_SCENES, SCENE_STEP } from '../data/storyline';
-import { ChevronLeft, ChevronRight, ArrowLeft, FolderGit2, Volume2, VolumeX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { dreamAudio } from '../utils/audio';
 
 interface SectionPlaneProps {
@@ -184,26 +184,8 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
 
       </div>
 
-      {/* Right Controls: Projects & Soundtrack Mute Toggle */}
+      {/* Right Controls: Soundtrack Mute Toggle */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <motion.button
-          type="button"
-          onClick={() => {
-            dreamAudio.playPop();
-            navigate('/projects');
-          }}
-          onMouseEnter={() => dreamAudio.playHover()}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="pointer-events-auto shrink-0 relative overflow-hidden flex items-center gap-1.5 bg-white/80 hover:bg-white/95 backdrop-blur-2xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full border border-white/60 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-700 hover:text-slate-900 transition-colors font-display font-bold text-xs uppercase tracking-wider cursor-pointer"
-          title="View Projects"
-          aria-label="View Projects"
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
-          <FolderGit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 shrink-0" />
-          <span className="hidden sm:inline">Projects</span>
-        </motion.button>
-
         <motion.button
           type="button"
           onClick={toggleSoundtrack}

@@ -12,6 +12,15 @@ export const CursorBackgroundBlurLens: React.FC = () => {
   const springX = useSpring(mouseX, { stiffness: 450, damping: 32 });
   const springY = useSpring(mouseY, { stiffness: 450, damping: 32 });
 
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     const media = window.matchMedia('(pointer: fine)');
     setHasMouse(media.matches);
@@ -44,7 +53,7 @@ export const CursorBackgroundBlurLens: React.FC = () => {
     };
   }, [hasMouse, isVisible, mouseX, mouseY]);
 
-  if (!hasMouse) return null;
+  if (!hasMouse || !isDesktop) return null;
 
   return (
     <motion.div
@@ -53,15 +62,15 @@ export const CursorBackgroundBlurLens: React.FC = () => {
         top: springY,
         opacity: isVisible ? 1 : 0,
       }}
-      className="fixed pointer-events-none z-[2] -translate-x-1/2 -translate-y-1/2 w-[240px] sm:w-[280px] h-[240px] sm:h-[280px] rounded-full will-change-transform"
+      className="fixed pointer-events-none z-[2] -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full will-change-transform hidden lg:block"
       aria-hidden="true"
     >
-      {/* ── LOCALIZED BACKGROUND BLUR WITH DISTANCE-BASED INTENSITY FALLOFF ── */}
+      {/* ── DECREASED SUBTLE NATURAL NEAR-SCREEN BLUR (LIGHT & NATURAL) ── */}
       <div
-        className="w-full h-full rounded-full backdrop-blur-[14px]"
+        className="w-full h-full rounded-full backdrop-blur-[1px]"
         style={{
-          WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 20%, rgba(0,0,0,0.65) 55%, rgba(0,0,0,0) 100%)',
-          maskImage: 'radial-gradient(circle at center, rgba(0,0,0,1) 20%, rgba(0,0,0,0.65) 55%, rgba(0,0,0,0) 100%)',
+          WebkitMaskImage: 'radial-gradient(circle at center, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
+          maskImage: 'radial-gradient(circle at center, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
         }}
       />
     </motion.div>

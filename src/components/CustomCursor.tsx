@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { isVirtualCursorEnabled } from './VirtualCursorPad';
 
 interface CursorBubble {
@@ -67,9 +67,9 @@ export const CustomCursor: React.FC = () => {
 
   const canTrackCursor = hasMouse || isVirtualCursorEnabled();
 
-  // ── Hide native cursor in Journey and Space pages where vehicles are active ──
+  // ── Hide native cursor on desktop when custom cursor is active ──
   useEffect(() => {
-    if (isJourney || isCosmic) {
+    if (isDesktopRatio && canTrackCursor) {
       document.body.classList.add('hide-native-cursor');
     } else {
       document.body.classList.remove('hide-native-cursor');
@@ -77,7 +77,7 @@ export const CustomCursor: React.FC = () => {
     return () => {
       document.body.classList.remove('hide-native-cursor');
     };
-  }, [isJourney, isCosmic]);
+  }, [isDesktopRatio, canTrackCursor]);
 
   // Pointer capability check
   useEffect(() => {
@@ -156,13 +156,15 @@ export const CustomCursor: React.FC = () => {
 
     const handleVirtualCursorClick = () => {
       setIsClicking(true);
-      setTimeout(() => setIsClicking(false), 220);
+      setTimeout(() => setIsClicking(false), 240);
     };
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) setIsClicking(true);
     };
-    const handleMouseUp = () => setIsClicking(false);
+    const handleMouseUp = () => {
+      setTimeout(() => setIsClicking(false), 150);
+    };
     const handleMouseEnterWindow = () => setIsVisible(true);
     const handleMouseLeaveWindow = (e: MouseEvent) => {
       if (
@@ -183,25 +185,26 @@ export const CustomCursor: React.FC = () => {
     document.addEventListener('mouseenter', handleMouseEnterWindow);
     document.addEventListener('mouseleave', handleMouseLeaveWindow);
 
-    // High performance RAF loop with smooth trailing lerp for the circle outline
+    // High performance RAF loop with smooth trailing lerp for the circle outline (decreased delay)
     const renderLoop = (time: number) => {
       const dx = mousePos.current.x - trailPos.current.x;
       const dy = mousePos.current.y - trailPos.current.y;
 
-      // ── SMOOTH DELAYED LERP FOR CIRCLE OUTLINE (~0.18) ──
-      // Chases the cursor with smooth fluid follow delay
-      const lerpFactor = isHovering ? 0.22 : 0.18;
+      // ── DECREASED DELAY LERP FOR CIRCLE OUTLINE (~0.38) ──
+      // Chases the cursor tightly with snappy, responsive fluid follow
+      const lerpFactor = isHovering ? 0.46 : 0.38;
       trailPos.current.x += dx * lerpFactor;
       trailPos.current.y += dy * lerpFactor;
       vel.current.x = dx * lerpFactor;
       vel.current.y = dy * lerpFactor;
 
       // Update immediate dot / pointer (instant, zero delay, follows real mouse directly)
+      // Tip of the pointer arrow SVG is at (3.5px, 3.5px), so translate by -3.5px to align tip with mousePos
       if (dotRef.current) {
-        dotRef.current.style.transform = `translate3d(${mousePos.current.x}px, ${mousePos.current.y}px, 0) translate(-50%, -50%)`;
+        dotRef.current.style.transform = `translate3d(${mousePos.current.x}px, ${mousePos.current.y}px, 0) translate(-3.5px, -3.5px)`;
       }
 
-      // Update trailing circle outline ring (smooth delayed follow)
+      // Update trailing circle outline ring (smooth delayed follow centered around cursor)
       if (ringRef.current) {
         ringRef.current.style.transform = `translate3d(${trailPos.current.x}px, ${trailPos.current.y}px, 0) translate(-50%, -50%)`;
       }
@@ -276,7 +279,7 @@ export const CustomCursor: React.FC = () => {
           </div>
         ))}
 
-      {/* ── 2. DELAYED TRAILING CIRCLE OUTLINE (CHASES MOUSE WITH FLUID DELAY) ── */}
+      {/* ── 2. TRAILING CIRCLE OUTLINE (CHASES MOUSE WITH DECREASED DELAY, GLASSY INSIDE BLUR) ── */}
       {/* Exclusively visible for desktop screen ratio; strictly hidden for mobile screen ratio */}
       {isDesktopRatio && (
         <div
@@ -284,182 +287,128 @@ export const CustomCursor: React.FC = () => {
           className="fixed top-0 left-0 pointer-events-none will-change-transform hidden lg:block"
           style={{ transform: 'translate3d(-100px, -100px, 0)' }}
         >
-          {/* 2A. LANDING: Warm Glass Glowing Ring */}
+          {/* 2A. LANDING: White Glassy Circle Outline with Inside Blur */}
           {isLanding && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-amber-300/80 bg-amber-400/10 backdrop-blur-[2.5px] shadow-[0_0_16px_rgba(251,191,36,0.35),inset_0_0_8px_rgba(255,255,255,0.2)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-white/65 bg-white/[0.08] backdrop-blur-[2.5px] shadow-[0_0_12px_rgba(255,255,255,0.25)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-14 h-14 border-amber-200 bg-amber-400/20 shadow-[0_0_24px_rgba(251,191,36,0.6)]'
+                  ? 'w-14 h-14 border-white/90 bg-white/[0.16] shadow-[0_0_18px_rgba(255,255,255,0.45)]'
                   : 'w-10 h-10'
               }`}
-            >
-              <div className="w-1 h-1 rounded-full bg-amber-200/60" />
-            </div>
+            />
           )}
 
-          {/* 2B. WORLD PAGE: Starlight Celestial Ring */}
+          {/* 2B. WORLD PAGE: Blue Glassy Circle Outline with Inside Blur */}
           {isWorld && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-purple-300/80 bg-purple-500/10 backdrop-blur-[2.5px] shadow-[0_0_18px_rgba(168,85,247,0.4),inset_0_0_8px_rgba(255,255,255,0.2)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-blue-400/65 bg-blue-500/[0.08] backdrop-blur-[2.5px] shadow-[0_0_12px_rgba(59,130,246,0.3)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-14 h-14 border-cyan-300 bg-cyan-400/20 shadow-[0_0_26px_rgba(6,182,212,0.55)]'
+                  ? 'w-14 h-14 border-blue-300/90 bg-blue-400/[0.18] shadow-[0_0_18px_rgba(59,130,246,0.45)]'
                   : 'w-10 h-10'
               }`}
             />
           )}
 
-          {/* 2C. JOURNEY PAGE: Dream Sky Blue Ring */}
+          {/* 2C. JOURNEY PAGE: White Glassy Circle Outline with Inside Blur */}
           {isJourney && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-300/85 bg-sky-400/15 backdrop-blur-[2.5px] shadow-[0_0_20px_rgba(56,189,248,0.45)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-white/70 bg-white/[0.08] backdrop-blur-[2.5px] shadow-[0_0_12px_rgba(255,255,255,0.25)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-14 h-14 bg-sky-400/25 border-white shadow-[0_0_28px_rgba(56,189,248,0.7)]'
+                  ? 'w-14 h-14 border-white/95 bg-white/[0.16] shadow-[0_0_18px_rgba(255,255,255,0.45)]'
                   : 'w-11 h-11'
               }`}
             />
           )}
 
-          {/* 2D. ABOUT ME PAGE: Oceanic Bubble Ring */}
+          {/* 2D. ABOUT ME PAGE: Green Glassy Circle Outline with Inside Blur */}
           {isAboutMe && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-300/85 bg-cyan-400/15 backdrop-blur-[3px] shadow-[0_0_20px_rgba(6,182,212,0.45),inset_0_0_8px_rgba(255,255,255,0.25)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-emerald-400/65 bg-emerald-500/[0.08] backdrop-blur-[2.5px] shadow-[0_0_12px_rgba(52,211,153,0.3)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-14 h-14 border-cyan-200 bg-cyan-300/25 shadow-[0_0_28px_rgba(6,182,212,0.7)]'
+                  ? 'w-14 h-14 border-emerald-300/90 bg-emerald-400/[0.18] shadow-[0_0_18px_rgba(52,211,153,0.45)]'
                   : 'w-10 h-10'
               }`}
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan-200/50" />
-            </div>
+            />
           )}
 
-          {/* 2E. SPACE / COSMIC PAGE: Neon Cyan Ring */}
+          {/* 2E. SPACE / COSMIC PAGE: Blue/Cyan Ring with Inside Blur */}
           {isCosmic && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-cyan-400/85 bg-cyan-500/15 backdrop-blur-[2.5px] shadow-[0_0_22px_rgba(6,182,212,0.5)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-blue-400/65 bg-blue-500/[0.08] backdrop-blur-[2.5px] shadow-[0_0_12px_rgba(59,130,246,0.3)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-14 h-14 bg-cyan-400/25 border-white shadow-[0_0_30px_rgba(6,182,212,0.8)]'
+                  ? 'w-14 h-14 border-blue-300/90 bg-blue-400/[0.18] shadow-[0_0_18px_rgba(59,130,246,0.45)]'
                   : 'w-11 h-11'
               }`}
             />
           )}
 
-          {/* 2F. CHAT, PROJECTS & OTHER PAGES: Crisp Dual-Tone Ring Visible on Light and Dark */}
+          {/* 2F. OTHER PAGES: White Glassy Ring with Inside Blur */}
           {!isLanding && !isWorld && !isJourney && !isAboutMe && !isCosmic && (
             <div
-              className={`rounded-full transition-all duration-300 ease-out flex items-center justify-center border border-sky-500/70 bg-sky-500/10 backdrop-blur-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.75),0_0_14px_rgba(56,189,248,0.35)] ${
+              className={`rounded-full transition-all duration-200 ease-out flex items-center justify-center border border-white/60 bg-white/[0.08] backdrop-blur-[2.5px] shadow-[0_0_10px_rgba(255,255,255,0.2)] ${
                 isClicking
                   ? 'w-8 h-8 scale-90'
                   : isHovering
-                  ? 'w-13 h-13 border-sky-400 bg-sky-400/20 shadow-[0_0_0_1.5px_rgba(255,255,255,0.95),0_0_22px_rgba(56,189,248,0.55)]'
+                  ? 'w-13 h-13 border-white/90 bg-white/[0.16] shadow-[0_0_16px_rgba(255,255,255,0.35)]'
                   : 'w-10 h-10'
               }`}
-            >
-              <div className="w-1 h-1 rounded-full bg-sky-500/40" />
-            </div>
+            />
           )}
         </div>
       )}
 
-      {/* ── 3. IMMEDIATE CURSOR POINT / THEMED ICONS (FOLLOWS MOUSE WITH 0 DELAY) ── */}
+      {/* ── 3. IMMEDIATE CURSOR: EXACT VIRTUAL CURSOR DESIGN & EXACT CLICK ANIMATION ── */}
       <div
         ref={dotRef}
-        className="fixed top-0 left-0 pointer-events-none will-change-transform z-10 flex items-center justify-center"
-        style={{ transform: 'translate3d(-100px, -100px, 0)' }}
+        className="fixed top-0 left-0 pointer-events-none will-change-transform z-10"
+        style={{ transform: 'translate3d(-100px, -100px, 0) translate(-3.5px, -3.5px)' }}
       >
-        {/* 3A. JOURNEY PAGE: PAPER AIRPLANE CURSOR ICON */}
-        {isJourney ? (
-          <div
-            className={`transition-transform duration-200 translate-x-[10px] translate-y-[10px] ${
-              isClicking ? 'scale-90 rotate-[10deg]' : isHovering ? 'scale-125' : 'scale-100'
+        <div className="relative">
+          {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
+          <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
+
+          {/* Main Pointer Arrow SVG (Exact design as Virtual Cursor) */}
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            className={`drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
+              isClicking ? 'scale-90 rotate-[-8deg]' : isHovering ? 'scale-110' : 'scale-100'
             }`}
-            style={{ transformOrigin: '2px 2px' }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="drop-shadow-[0_2px_8px_rgba(14,165,233,0.7)]"
-            >
-              <path
-                d="M 22 12 L 2 2 L 12 22 L 14 14 Z"
-                fill="#ffffff"
-                stroke="#38bdf8"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
+            <path
+              d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z"
+              fill="#06b6d4"
+              stroke="#ffffff"
+              strokeWidth="2.2"
+              strokeLinejoin="round"
+            />
+          </svg>
+
+          {/* Exact Click Ripple Indicator Animation */}
+          <AnimatePresence>
+            {isClicking && (
+              <motion.div
+                initial={{ scale: 0.2, opacity: 1 }}
+                animate={{ scale: 3.2, opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="absolute top-[3.5px] left-[3.5px] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border-2 border-cyan-300 bg-cyan-400/40 pointer-events-none"
               />
-              <path
-                d="M 2 2 L 14 14"
-                stroke="#0284c7"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        ) : isCosmic ? (
-          /* 3B. SPACE / COSMIC PAGE: ROCKET CURSOR ICON */
-          <div
-            className={`transition-transform duration-200 translate-x-[8px] translate-y-[8px] ${
-              isClicking ? 'scale-90 rotate-[-8deg]' : isHovering ? 'scale-125' : 'scale-100'
-            }`}
-            style={{ transformOrigin: '5px 5px' }}
-          >
-            <svg
-              width="26"
-              height="26"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="drop-shadow-[0_2px_10px_rgba(6,182,212,0.8)] -rotate-45"
-            >
-              <path
-                d="M12 2C8 4 6 8 6 12L4 14V17L7 16L9 18H12L14 14C14 10 12 6 12 2Z"
-                fill="#ffffff"
-                stroke="#06b6d4"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12 2C16 4 18 8 18 12L20 14V17L17 16L15 18H12"
-                fill="#e0f2fe"
-                stroke="#06b6d4"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-              />
-              <circle cx="12" cy="9" r="1.5" fill="#0284c7" />
-              <motion.path
-                d="M10 18 L12 23 L14 18 Z"
-                fill="#f59e0b"
-                animate={{ scaleY: [1, 1.4, 0.9, 1] }}
-                transition={{ duration: 0.3, repeat: Infinity }}
-              />
-            </svg>
-          </div>
-        ) : (
-          /* 3C. STANDARD CURSOR CENTER DOT */
-          <div
-            className={`rounded-full transition-all duration-150 ${
-              isLanding
-                ? 'w-2 h-2 bg-amber-300 shadow-[0_0_8px_#fde047]'
-                : isAboutMe
-                ? 'w-2 h-2 bg-cyan-300 shadow-[0_0_8px_#38bdf8]'
-                : isWorld
-                ? 'w-2 h-2 bg-purple-300 shadow-[0_0_8px_#c084fc]'
-                : isChat
-                ? 'w-2 h-2 bg-sky-600 shadow-[0_0_6px_rgba(2,132,199,0.7)]'
-                : 'w-2 h-2 bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)]'
-            } ${isClicking ? 'scale-150' : isHovering ? 'scale-75 opacity-70' : 'scale-100'}`}
-          />
-        )}
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

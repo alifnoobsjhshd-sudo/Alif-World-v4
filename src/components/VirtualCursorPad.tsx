@@ -22,7 +22,8 @@ export const VirtualCursorPad: React.FC = () => {
   const path = location.pathname.toLowerCase();
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
   const isCosmic = path.startsWith('/explore-work') || path.startsWith('/space');
-  const hideReticle = isJourney || isCosmic;
+  // Unified reticle: CustomCursor is the authoritative renderer for the virtual cursor
+  const hideReticle = true;
 
   // Virtual cursor coordinates on screen
   const [cursorPos, setCursorPos] = useState({

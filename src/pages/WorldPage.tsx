@@ -483,10 +483,10 @@ export const WorldPage: React.FC = () => {
               whileTap={{ scale: 0.96 }}
               className="relative flex flex-col items-center"
             >
-              {/* Theme Color Glow from Background (Rose) - Diffuses smoothly with zero clipping */}
+              {/* Theme Color Glow from Background (Rose) - Gentle, natural, professional ambient glow */}
               <div
-                className={`absolute inset-[-15%] rounded-full bg-rose-500/35 blur-3xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'story' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
+                className={`absolute inset-[-8%] rounded-full bg-rose-400/20 blur-2xl pointer-events-none transition-all duration-500 ${
+                  hoveredIsland === 'story' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
                 }`}
               />
 
@@ -507,7 +507,7 @@ export const WorldPage: React.FC = () => {
                   scale: hoveredIsland === 'story' ? 1.05 : 1.0,
                 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider uppercase text-rose-200 drop-shadow-[0_2px_10px_rgba(244,63,94,0.95)] group-hover:text-white transition-colors"
+                className="mt-1 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider uppercase text-rose-200 drop-shadow-[0_1px_8px_rgba(244,63,94,0.6)] group-hover:text-white transition-colors"
               >
                 The Story
               </motion.span>
@@ -518,7 +518,7 @@ export const WorldPage: React.FC = () => {
               ISLAND 2: "MY WORKS" (Purple Theme)
               - Desktop: Bottom-Left (Lifted up for balanced professional spacing)
               - Mobile: Bottom-Left (Lifted up)
-             ══════════════════════════════════════════════════════════════════ */}
+              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={worksIslandRef}
             onClick={() => handleIslandClick('works')}
@@ -546,10 +546,10 @@ export const WorldPage: React.FC = () => {
               whileTap={{ scale: 0.96 }}
               className="relative flex flex-col items-center"
             >
-              {/* Theme Color Glow from Background (Purple) */}
+              {/* Theme Color Glow from Background (Purple) - Gentle, natural, professional ambient glow */}
               <div
-                className={`absolute inset-[-12%] rounded-full bg-purple-600/40 blur-2xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'works' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
+                className={`absolute inset-[-8%] rounded-full bg-purple-500/22 blur-2xl pointer-events-none transition-all duration-500 ${
+                  hoveredIsland === 'works' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
                 }`}
               />
 
@@ -570,7 +570,7 @@ export const WorldPage: React.FC = () => {
                   scale: hoveredIsland === 'works' ? 1.05 : 1.0,
                 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-purple-300 drop-shadow-[0_2px_14px_rgba(168,85,247,0.95)] group-hover:text-purple-100 transition-colors"
+                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-purple-300 drop-shadow-[0_1px_8px_rgba(168,85,247,0.6)] group-hover:text-purple-100 transition-colors"
               >
                 My Works
               </motion.span>
@@ -581,7 +581,7 @@ export const WorldPage: React.FC = () => {
               ISLAND 3: "ABOUT ME" / "MORE ABOUT HIM"
               - Desktop: Bottom-Right (Lifted up for balanced professional spacing)
               - Mobile: Middle-Right (Lifted up)
-             ══════════════════════════════════════════════════════════════════ */}
+              ══════════════════════════════════════════════════════════════════ */}
           <div
             ref={aboutIslandRef}
             onClick={() => handleIslandClick('about')}
@@ -609,10 +609,10 @@ export const WorldPage: React.FC = () => {
               whileTap={{ scale: 0.96 }}
               className="relative flex flex-col items-center"
             >
-              {/* Theme Color Glow from Background (Cyan) */}
+              {/* Theme Color Glow from Background (Cyan) - Gentle, natural, professional ambient glow */}
               <div
-                className={`absolute inset-[-12%] rounded-full bg-cyan-400/40 blur-2xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'about' ? 'opacity-100 scale-125' : 'opacity-0 scale-90'
+                className={`absolute inset-[-8%] rounded-full bg-sky-400/22 blur-2xl pointer-events-none transition-all duration-500 ${
+                  hoveredIsland === 'about' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
                 }`}
               />
 
@@ -633,7 +633,7 @@ export const WorldPage: React.FC = () => {
                   scale: hoveredIsland === 'about' ? 1.05 : 1.0,
                 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-cyan-200 drop-shadow-[0_2px_12px_rgba(6,182,212,0.95)] group-hover:text-white transition-colors"
+                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-cyan-200 drop-shadow-[0_1px_8px_rgba(6,182,212,0.6)] group-hover:text-white transition-colors"
               >
                 More About Him
               </motion.span>
