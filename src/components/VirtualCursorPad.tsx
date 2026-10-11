@@ -43,6 +43,30 @@ export const VirtualCursorPad: React.FC = () => {
   const [sensitivity, setSensitivity] = useState<number>(1.8);
   const [hoveredTag, setHoveredTag] = useState<string>('viewport');
 
+  // Responsive screen ratio tracking: cursor is visible exclusively on desktop ratios
+  const [isDesktopRatio, setIsDesktopRatio] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const isDesktopWidth = window.innerWidth >= 1024;
+    const isTouchOnly = window.matchMedia('(pointer: coarse) and not (pointer: fine)').matches;
+    return isDesktopWidth && !isTouchOnly;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      const isDesktopWidth = window.innerWidth >= 1024;
+      const isTouchOnly = window.matchMedia('(pointer: coarse) and not (pointer: fine)').matches;
+      setIsDesktopRatio(isDesktopWidth && !isTouchOnly);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
   const padDragStartRef = useRef<{ startX: number; startY: number; padStartX: number; padStartY: number } | null>(null);
   const lastTouchRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
@@ -325,14 +349,14 @@ export const VirtualCursorPad: React.FC = () => {
     updateCursorPosition(window.innerWidth / 2, window.innerHeight / 2);
   };
 
-  if (!enabled) return null;
+  if (!enabled || !isDesktopRatio) return null;
 
   return (
     <>
       {/* ── 1. VIRTUAL CURSOR RETICLE ON SCREEN (Hidden on Journey & Space pages) ── */}
       {!hideReticle && (
         <div
-          className="fixed pointer-events-none z-[100000] select-none will-change-transform"
+          className="fixed pointer-events-none z-[100000] select-none will-change-transform hidden lg:block"
           style={{
             left: cursorPos.x,
             top: cursorPos.y,
@@ -386,7 +410,7 @@ export const VirtualCursorPad: React.FC = () => {
         onTouchMove={stopPageTouch}
         onTouchEnd={stopPageTouch}
         onTouchCancel={stopPageTouch}
-        className="fixed z-[99998] select-none touch-none"
+        className="fixed z-[99998] select-none touch-none hidden lg:block"
         style={{
           left: padPos.x,
           top: padPos.y,

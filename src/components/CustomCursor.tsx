@@ -21,16 +21,20 @@ export const CustomCursor: React.FC = () => {
   const [isHovering, setIsHovering] = useState(false);
   const [isClicking, setIsClicking] = useState(false);
 
-  // Responsive screen ratio tracking: outline is visible exclusively on desktop ratios
-  const [isDesktopRatio, setIsDesktopRatio] = useState<boolean>(() => {
+  // Responsive screen ratio tracking: cursor is visible exclusively on desktop ratios
+  const checkDesktopRatio = () => {
     if (typeof window === 'undefined') return true;
-    return window.innerWidth >= 1024;
-  });
+    const isDesktopWidth = window.innerWidth >= 1024;
+    const isTouchOnly = window.matchMedia('(pointer: coarse) and not (pointer: fine)').matches;
+    return isDesktopWidth && !isTouchOnly;
+  };
+
+  const [isDesktopRatio, setIsDesktopRatio] = useState<boolean>(checkDesktopRatio);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleScreenResize = () => {
-      setIsDesktopRatio(window.innerWidth >= 1024);
+      setIsDesktopRatio(checkDesktopRatio());
     };
     handleScreenResize();
     window.addEventListener('resize', handleScreenResize, { passive: true });
@@ -251,11 +255,12 @@ export const CustomCursor: React.FC = () => {
     return () => clearTimeout(timer);
   }, [bubbles]);
 
-  if (!canTrackCursor) return null;
+  // Return null if cannot track or on mobile screen ratio
+  if (!canTrackCursor || !isDesktopRatio) return null;
 
   return (
     <div
-      className={`fixed inset-0 pointer-events-none z-[99999] transition-opacity duration-300 ${
+      className={`fixed inset-0 pointer-events-none z-[99999] transition-opacity duration-300 hidden lg:block ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       aria-hidden="true"
@@ -368,48 +373,51 @@ export const CustomCursor: React.FC = () => {
       )}
 
       {/* ── 3. IMMEDIATE CURSOR: EXACT VIRTUAL CURSOR DESIGN & EXACT CLICK ANIMATION ── */}
-      <div
-        ref={dotRef}
-        className="fixed top-0 left-0 pointer-events-none will-change-transform z-10"
-        style={{ transform: 'translate3d(-100px, -100px, 0) translate(-3.5px, -3.5px)' }}
-      >
-        <div className="relative">
-          {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
-          <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
+      {/* Exclusively visible for desktop screen ratio; strictly hidden for mobile screen ratio */}
+      {isDesktopRatio && (
+        <div
+          ref={dotRef}
+          className="fixed top-0 left-0 pointer-events-none will-change-transform z-10 hidden lg:block"
+          style={{ transform: 'translate3d(-100px, -100px, 0) translate(-3.5px, -3.5px)' }}
+        >
+          <div className="relative">
+            {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
+            <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
 
-          {/* Main Pointer Arrow SVG (Exact design as Virtual Cursor) */}
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            className={`drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
-              isClicking ? 'scale-90 rotate-[-8deg]' : isHovering ? 'scale-110' : 'scale-100'
-            }`}
-          >
-            <path
-              d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z"
-              fill="#06b6d4"
-              stroke="#ffffff"
-              strokeWidth="2.2"
-              strokeLinejoin="round"
-            />
-          </svg>
-
-          {/* Exact Click Ripple Indicator Animation */}
-          <AnimatePresence>
-            {isClicking && (
-              <motion.div
-                initial={{ scale: 0.2, opacity: 1 }}
-                animate={{ scale: 3.2, opacity: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="absolute top-[3.5px] left-[3.5px] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border-2 border-cyan-300 bg-cyan-400/40 pointer-events-none"
+            {/* Main Pointer Arrow SVG (Exact design as Virtual Cursor) */}
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              className={`drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] transition-transform duration-75 ${
+                isClicking ? 'scale-90 rotate-[-8deg]' : isHovering ? 'scale-110' : 'scale-100'
+              }`}
+            >
+              <path
+                d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z"
+                fill="#06b6d4"
+                stroke="#ffffff"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
               />
-            )}
-          </AnimatePresence>
+            </svg>
+
+            {/* Exact Click Ripple Indicator Animation */}
+            <AnimatePresence>
+              {isClicking && (
+                <motion.div
+                  initial={{ scale: 0.2, opacity: 1 }}
+                  animate={{ scale: 3.2, opacity: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="absolute top-[3.5px] left-[3.5px] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border-2 border-cyan-300 bg-cyan-400/40 pointer-events-none"
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

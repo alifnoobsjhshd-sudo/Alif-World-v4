@@ -56,11 +56,22 @@ html, body {
   inset: 0;
 }
 
-/* ── Complete Native Cursor Hiding on Themed Pages (Journey & Space) ── */
-body.hide-native-cursor,
-body.hide-native-cursor *,
-.hide-native-cursor,
-.hide-native-cursor * {
-  cursor: none !important;
+/* ── Complete Native Cursor Hiding on Desktop when Custom Cursor is Active ── */
+@media (min-width: 1024px) {
+  body.hide-native-cursor,
+  body.hide-native-cursor *,
+  .hide-native-cursor,
+  .hide-native-cursor * {
+    cursor: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  body.hide-native-cursor,
+  body.hide-native-cursor *,
+  .hide-native-cursor,
+  .hide-native-cursor * {
+    cursor: auto !important;
+  }
 }
 
