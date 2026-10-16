@@ -301,8 +301,8 @@ export const SnappedCloudCharacter: React.FC<SnappedCloudCharacterProps> = React
               loading="eager"
               decoding="async"
               className={id === 16 
-                ? "w-full max-w-[270px] sm:max-w-[320px] md:max-w-[360px] h-auto object-contain select-none drop-shadow-[0_22px_36px_rgba(0,0,0,0.13)] pointer-events-none"
-                : "w-full max-w-[320px] sm:max-w-[400px] md:max-w-[450px] h-auto object-contain select-none drop-shadow-[0_22px_36px_rgba(0,0,0,0.13)] pointer-events-none"
+                ? "w-full max-w-[220px] sm:max-w-[250px] md:max-w-[270px] lg:max-w-[360px] h-auto object-contain select-none drop-shadow-[0_22px_36px_rgba(0,0,0,0.13)] pointer-events-none"
+                : "w-full max-w-[250px] sm:max-w-[260px] md:max-w-[280px] lg:max-w-[450px] h-auto object-contain select-none drop-shadow-[0_22px_36px_rgba(0,0,0,0.13)] pointer-events-none"
               }
               referrerPolicy="no-referrer"
             />

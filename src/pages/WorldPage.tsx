@@ -5,6 +5,8 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
+import worldCutsceneUrl from '../../cutscenes-2.mp4';
 
 // Visual assets
 import worldBoardBgRemote from '../assets/images/sky_mountain_realm_1790820082936.jpg'; // fallback
@@ -20,7 +22,7 @@ import {
 const WOOD_BOARD_BG_URL = 'https://i.postimg.cc/FHBPzSP2/d28f364d-caca-44e7-a29a-a2f431d6bbf4.jpg';
 const WOOD_BOARD_LOCAL_URL = '/world-wood-board.jpg';
 
-export const WorldPage: React.FC = () => {
+export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoading = false }) => {
   const navigate = useNavigate();
   const clusterRef = useRef<HTMLDivElement>(null);
   const storyIslandRef = useRef<HTMLDivElement>(null);
@@ -34,8 +36,10 @@ export const WorldPage: React.FC = () => {
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const [hoveredIsland, setHoveredIsland] = useState<'story' | 'about' | 'works' | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
-  const [isEntering, setIsEntering] = useState(true);
+  const [isEntering, setIsEntering] = useState(false);
+  const [hasCutsceneEnded, setHasCutsceneEnded] = useState(false);
   const [bgSrc, setBgSrc] = useState(WOOD_BOARD_LOCAL_URL);
+  const isCutsceneActive = !initialLoading && !hasCutsceneEnded;
 
   // Responsive tracker
   useEffect(() => {
@@ -67,6 +71,8 @@ export const WorldPage: React.FC = () => {
 
   // Peaceful World Theme Background Music (Airflows and air sound effects removed per request)
   useEffect(() => {
+    if (!hasCutsceneEnded) return;
+
     dreamAudio.startWorldSkyMusic();
 
     const handleFirstGesture = () => {
@@ -82,7 +88,7 @@ export const WorldPage: React.FC = () => {
       window.removeEventListener('keydown', handleFirstGesture);
       dreamAudio.stopWorldSkyMusic(1.0);
     };
-  }, []);
+  }, [hasCutsceneEnded]);
 
   useEffect(() => {
     const handleMove = (x: number, y: number) => {
@@ -578,6 +584,16 @@ export const WorldPage: React.FC = () => {
       <WorksRocketLaunchTransition
         isActive={activeTransition === 'works'}
         onComplete={() => handleTransitionComplete('/explore-works')}
+      />
+
+      <CinematicVideoCutscene
+        isActive={isCutsceneActive}
+        onComplete={() => {
+          setHasCutsceneEnded(true);
+          setIsEntering(true);
+        }}
+        shouldPreload
+        videoSrc={worldCutsceneUrl}
       />
     </div>
   );

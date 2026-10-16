@@ -472,7 +472,7 @@ export default function App() {
         </AnimatePresence>
         <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/world" element={<WorldPage />} />
+        <Route path="/world" element={<WorldPage initialLoading={initialLoading} />} />
         <Route path="/journey" element={<StorylinePortfolio initialLoading={initialLoading} />} />
         <Route path="/story" element={<StorylinePortfolio initialLoading={initialLoading} />} />
         <Route path="/projects" element={<ProjectsPage initialLoading={initialLoading} />} />

@@ -14,22 +14,6 @@ interface StorySceneViewProps {
   fromLetsDrive?: boolean;
 }
 
-function getTopBubbleOffset(bubblePlacement: string): string {
-  switch (bubblePlacement) {
-    case 'above': // Scene 02: Lying down on stomach, head is lower down
-      return 'top-6 sm:top-8 md:top-10';
-    case 'high-above': // Scene 04: Standing tall looking up
-      return '-top-6 sm:-top-5 md:-top-4';
-    case 'high-contrast': // Scene 11: Breaking through, standing
-    case 'cinematic-large': // Scene 13: Standing proudly on peak
-      return '-top-5 sm:-top-4 md:-top-3';
-    case 'above-laptop': // Scene 07: Sitting with laptop
-    case 'above-airplane': // Scene 14: Sitting in flight
-    default:
-      return '-top-2 sm:-top-1 md:top-0';
-  }
-}
-
 export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene, onOpenContact, onExploreWork, fromLetsDrive = false }) => {
   const navigate = useNavigate();
   const isReveal = scene.id === 16;
@@ -68,26 +52,20 @@ export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene
       {/* ── CENTRAL SNAPPED CLOUD + CHARACTER SECTION ELEMENT ──────────────── */}
       <div className="relative flex flex-col items-center justify-center min-w-[320px] sm:min-w-[500px] md:min-w-[660px]">
         
-        {/* Top-centered floating bubble — balanced naturally above character head */}
-        {isTopPlaced && (
-          <div className={`absolute left-1/2 -translate-x-1/2 z-40 ${getTopBubbleOffset(scene.bubblePlacement)}`}>
-            <StorySpeechBubble scene={scene} />
-          </div>
-        )}
-
-        {/* Left floating bubble — balanced beside upper torso / head */}
-        {isLeftPlaced && (
-          <div className="absolute top-2 sm:top-4 md:top-6 left-1 sm:-left-12 md:-left-20 z-40">
-            <StorySpeechBubble scene={scene} />
-          </div>
-        )}
-
-        {/* Right floating bubble — balanced beside upper torso / head */}
-        {isRightPlaced && (
-          <div className="absolute top-2 sm:top-4 md:top-6 right-1 sm:-right-12 md:-right-20 z-40">
-            <StorySpeechBubble scene={scene} />
-          </div>
-        )}
+        {/* Reserve a row above the character so the speech bubble never covers him. */}
+        <div
+          className={`relative z-40 flex w-full items-center ${
+            isTopPlaced
+              ? 'justify-center'
+              : isLeftPlaced
+                ? 'justify-start'
+                : isRightPlaced
+                  ? 'justify-end'
+                  : 'justify-center'
+          } mb-2`}
+        >
+          <StorySpeechBubble scene={scene} />
+        </div>
 
         {/* The character seated and snapped with the cloud in scene-specific pose */}
         <div className="my-2">

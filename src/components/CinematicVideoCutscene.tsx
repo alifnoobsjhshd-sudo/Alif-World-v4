@@ -21,7 +21,6 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   videoSrc,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const windAudioRef = useRef<HTMLAudioElement | null>(null);
   const completedRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const activeRef = useRef(isActive);
@@ -40,49 +39,19 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     timersRef.current = {};
   }, []);
 
-  const getWindAudio = useCallback(() => {
-    if (!windAudioRef.current) {
-      const audio = new Audio('/cutscene-wind.mp3');
-      audio.loop = true;
-      audio.preload = 'auto';
-      audio.volume = 0.58;
-      windAudioRef.current = audio;
-    }
-    return windAudioRef.current;
-  }, []);
-
-  const stopWindAudio = useCallback((reset = true) => {
-    const audio = windAudioRef.current;
-    if (!audio) return;
-    audio.pause();
-    if (reset) {
-      try {
-        audio.currentTime = 0;
-      } catch {}
-    }
-  }, []);
-
   const complete = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
     clearPlaybackTimers();
-    stopWindAudio();
     videoRef.current?.pause();
     onCompleteRef.current();
-  }, [clearPlaybackTimers, stopWindAudio]);
-
-  useEffect(() => {
-    if (!shouldPreload || isActive) return;
-    const audio = getWindAudio();
-    if (audio.readyState === HTMLMediaElement.HAVE_NOTHING) audio.load();
-  }, [getWindAudio, isActive, shouldPreload]);
+  }, [clearPlaybackTimers]);
 
   useEffect(() => {
     if (!isActive) {
       completedRef.current = false;
       setPlaybackIssue(null);
       clearPlaybackTimers();
-      stopWindAudio();
       return;
     }
 
@@ -92,11 +61,9 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     const video = videoRef.current;
     if (!video) return;
-    const windAudio = getWindAudio();
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    video.muted = true;
+    video.muted = false;
     video.preload = 'auto';
 
     const scheduleFailsafe = (delay: number) => {
@@ -116,25 +83,9 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         timersRef.current.stall = undefined;
       }
       setPlaybackIssue(null);
-      if (windAudio.paused) {
-        if (Number.isFinite(windAudio.duration) && windAudio.duration > 0) {
-          const expectedTime = video.currentTime % windAudio.duration;
-          if (Math.abs(windAudio.currentTime - expectedTime) > 0.75) {
-            try {
-              windAudio.currentTime = expectedTime;
-            } catch {}
-          }
-        }
-        windAudio.play().then(() => {
-          if (!activeRef.current || completedRef.current || video.paused || video.ended) {
-            windAudio.pause();
-          }
-        }).catch(() => {});
-      }
     };
 
     const handleWaiting = () => {
-      windAudio.pause();
       if (timersRef.current.stall !== undefined) {
         window.clearTimeout(timersRef.current.stall);
       }
@@ -145,20 +96,16 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     const handleStalled = () => handleWaiting();
 
-    const handleError = () => {
-      windAudio.pause();
-      setPlaybackIssue('error');
-    };
-    const handlePause = () => windAudio.pause();
+    const handleError = () => setPlaybackIssue('error');
     const handleMetadata = () => {
       if (Number.isFinite(video.duration) && video.duration > 0) {
         scheduleFailsafe(Math.max(PLAYBACK_FAILSAFE_MS, video.duration * 1000 + 20_000));
       }
     };
 
-    const playMutedVideo = async () => {
+    const startVideoPlayback = async () => {
       if (!activeRef.current || completedRef.current) return;
-      video.muted = true;
+      video.muted = false;
       try {
         await video.play();
       } catch {
@@ -166,13 +113,12 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       }
     };
 
-    const handleCanPlay = () => void playMutedVideo();
+    const handleCanPlay = () => void startVideoPlayback();
 
     video.addEventListener('playing', handlePlaying);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('stalled', handleStalled);
     video.addEventListener('error', handleError);
-    video.addEventListener('pause', handlePause);
     video.addEventListener('loadedmetadata', handleMetadata);
     scheduleFailsafe(PLAYBACK_FAILSAFE_MS);
     timersRef.current.startup = window.setTimeout(() => {
@@ -191,26 +137,13 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('stalled', handleStalled);
       video.removeEventListener('error', handleError);
-      video.removeEventListener('pause', handlePause);
       video.removeEventListener('loadedmetadata', handleMetadata);
       video.removeEventListener('canplay', handleCanPlay);
       video.pause();
-      stopWindAudio();
       clearPlaybackTimers();
       document.body.style.overflow = previousOverflow;
     };
-  }, [clearPlaybackTimers, complete, getWindAudio, isActive, stopWindAudio, videoSrc]);
-
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') complete();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [complete, isActive]);
+  }, [clearPlaybackTimers, complete, isActive, videoSrc]);
 
   const retryPlayback = async () => {
     const video = videoRef.current;
@@ -219,7 +152,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     setPlaybackIssue(null);
     try {
       if (video.error) video.load();
-      video.muted = true;
+      video.muted = false;
       await video.play();
     } catch {
       setPlaybackIssue('blocked');
@@ -252,7 +185,6 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         ref={videoRef}
         src={videoSrc}
         playsInline
-        muted
         preload={isActive || shouldPreload ? 'auto' : 'none'}
         controls={false}
         disablePictureInPicture
@@ -292,7 +224,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
                 onClick={complete}
                 className="min-h-11 border border-white/30 px-5 font-mono text-xs uppercase tracking-wider hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
-                Continue to Worlds
+                Continue
               </button>
             </div>
           </div>
