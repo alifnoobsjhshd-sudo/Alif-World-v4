@@ -359,10 +359,10 @@ export const LandingPage: React.FC = () => {
                 y: cloudParallaxY,
                 transform: 'translateZ(80px)',
               }}
-              className="absolute left-[9%] top-[10%] sm:left-[10%] sm:top-[12%] md:left-[11%] md:top-[14%] lg:left-[12%] lg:top-[16%] xl:left-[14%] xl:top-[17.5%] 2xl:left-[15%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-30 pointer-events-auto"
+              className="absolute left-[18%] top-[26%] sm:left-[18.5%] sm:top-[26%] md:left-[18%] md:top-[26%] lg:left-[14%] lg:top-[16%] xl:left-[16%] xl:top-[17.5%] 2xl:left-[17%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-30 pointer-events-auto"
             >
               <motion.div
-                className="relative w-[180px] sm:w-[200px] md:w-[220px] lg:w-[250px] xl:w-[300px] 2xl:w-[340px] h-[112px] sm:h-[122px] md:h-[136px] lg:h-[150px] xl:h-[180px] 2xl:h-[195px] cursor-pointer"
+                className="relative w-[150px] sm:w-[170px] md:w-[180px] lg:w-[250px] xl:w-[300px] 2xl:w-[340px] h-[88px] sm:h-[100px] md:h-[106px] lg:h-[150px] xl:h-[180px] 2xl:h-[195px] cursor-pointer"
                 onClick={handleStartStory}
                 onMouseEnter={() => {
                   setIsHoveringStory(true);

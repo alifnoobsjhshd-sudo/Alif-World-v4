@@ -477,7 +477,7 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
                 dreamAudio.playHover();
               }}
               onMouseLeave={() => setHoveredIsland(null)}
-              className="absolute left-[38%] top-[2%] -translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
+              className="absolute left-[38%] top-[2%] max-[900px]:top-[-4%] -translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
               title="The Story · Click to Explore"
             >
               {/* Stationary firmly stuck container */}

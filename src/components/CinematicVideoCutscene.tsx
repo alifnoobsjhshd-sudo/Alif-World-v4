@@ -177,8 +177,8 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       aria-hidden={!isActive}
       aria-label={isActive ? "Alif's portfolio film" : undefined}
       style={{
-        height: isActive ? '100dvh' : '1px',
-        width: isActive ? '100vw' : '1px',
+          height: isActive ? '100%' : '1px',
+          width: isActive ? '100%' : '1px',
       }}
     >
       <video
@@ -192,7 +192,7 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         onEnded={complete}
         className={
           isActive
-            ? 'absolute inset-0 h-full w-full bg-black object-cover'
+            ? 'cinematic-cutscene-video absolute inset-0 h-full w-full bg-black'
             : 'absolute inset-0 h-px w-px object-cover'
         }
         aria-label="Portfolio introduction film"
