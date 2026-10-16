@@ -14,8 +14,8 @@ export const StorySpeechBubble: React.FC<StorySpeechBubbleProps> = ({ scene, cla
   const isUnforgettable = scene.theme === 'unforgettable';
   const isReveal = scene.theme === 'reveal';
 
-  // Specific tilt for wind-tilted bubble
-  const tiltClass = scene.bubblePlacement === 'wind-tilted' ? '-rotate-2 sm:-rotate-3' : '';
+  // Specific subtle static tilt for wind-tilted bubble
+  const tiltClass = scene.bubblePlacement === 'wind-tilted' ? '-rotate-1' : '';
 
   // Determine pointer tail placement
   const isLeftPlaced = 
@@ -34,38 +34,41 @@ export const StorySpeechBubble: React.FC<StorySpeechBubbleProps> = ({ scene, cla
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ 
         opacity: 1, 
-        y: [0, -4, 0],
-        scale: 1,
-        rotate: scene.bubblePlacement === 'wind-tilted' ? [-2, -4, -2] : [0, 0.4, 0]
+        y: [0, -3, 0],
       }}
       transition={{ 
-        y: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' },
-        rotate: { duration: 3.5, repeat: Infinity, ease: 'easeInOut' }
+        opacity: { duration: 0.25 },
+        y: { duration: 3.8, repeat: Infinity, ease: 'easeInOut' }
       }}
-      className={`relative z-30 max-w-[210px] sm:max-w-[260px] md:max-w-[290px] select-none filter drop-shadow-md ${tiltClass} ${className}`}
+      className={`relative z-40 max-w-[280px] sm:max-w-[340px] md:max-w-[380px] select-none ${tiltClass} ${className}`}
     >
       <div 
-        className={`relative px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl border-2 transition-all duration-300 ${
+        className={`relative px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl border transition-all duration-300 ${
           isStorm 
-            ? 'bg-slate-900/95 text-slate-100 border-slate-700 shadow-[0_10px_25px_rgba(15,23,42,0.4)] backdrop-blur-md'
+            ? 'bg-slate-900 text-amber-50 border-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.45)]'
             : isSunset
-            ? 'bg-gradient-to-br from-amber-50/95 via-rose-50/95 to-purple-50/95 text-slate-800 border-amber-200/90 shadow-[0_10px_25px_rgba(249,115,22,0.18)] backdrop-blur-sm'
+            ? 'bg-[#fffdf9] text-slate-900 border-amber-300/80 shadow-[0_8px_24px_rgba(249,115,22,0.18)]'
             : isBreakthrough
-            ? 'bg-gradient-to-b from-white to-amber-50 text-slate-900 border-amber-300 shadow-[0_12px_30px_rgba(251,191,36,0.25)]'
+            ? 'bg-white text-slate-900 border-amber-400/80 shadow-[0_8px_24px_rgba(251,191,36,0.22)]'
             : isUnforgettable
-            ? 'bg-white/95 text-slate-800 border-indigo-200/90 shadow-[0_12px_30px_rgba(99,102,241,0.16)] backdrop-blur-md'
+            ? 'bg-white text-slate-900 border-indigo-300/80 shadow-[0_8px_24px_rgba(99,102,241,0.18)]'
             : isReveal
-            ? 'bg-white text-slate-900 border-sky-300 shadow-[0_12px_30px_rgba(56,189,248,0.2)]'
-            : 'bg-white/95 text-slate-800 border-slate-200 shadow-[0_10px_25px_rgba(0,0,0,0.06)] backdrop-blur-sm'
+            ? 'bg-white text-slate-900 border-sky-300/80 shadow-[0_8px_24px_rgba(56,189,248,0.2)]'
+            : 'bg-white text-slate-900 border-slate-200/90 shadow-[0_8px_24px_rgba(0,0,0,0.08)]'
         }`}
       >
-        {/* Speech Bubble Quote */}
+        {/* Speech Bubble Quote - Ultra crisp, crystal-sharp typography */}
         <p 
-          className={`font-hand text-xs sm:text-sm md:text-base leading-snug tracking-normal ${
-            isStorm ? 'text-amber-100' : 'text-slate-800'
+          style={{
+            WebkitFontSmoothing: 'antialiased',
+            MozOsxFontSmoothing: 'grayscale',
+            textRendering: 'optimizeLegibility',
+          }}
+          className={`font-display font-bold text-sm sm:text-[15px] md:text-base leading-snug tracking-normal ${
+            isStorm ? 'text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]' : 'text-slate-950'
           }`}
         >
           {scene.bubble}
@@ -73,13 +76,13 @@ export const StorySpeechBubble: React.FC<StorySpeechBubbleProps> = ({ scene, cla
 
         {/* Tail / Connector Pointer */}
         {isRightPlaced && (
-          <div className="absolute -bottom-2 left-4 sm:left-5 w-3.5 h-3.5 bg-inherit border-r-2 border-b-2 border-inherit rotate-45 transform" />
+          <div className="absolute -bottom-1.5 left-4 sm:left-5 w-3 h-3 bg-inherit border-r border-b border-inherit rotate-45 transform" />
         )}
         {isLeftPlaced && (
-          <div className="absolute -bottom-2 right-4 sm:right-5 w-3.5 h-3.5 bg-inherit border-r-2 border-b-2 border-inherit rotate-45 transform" />
+          <div className="absolute -bottom-1.5 right-4 sm:right-5 w-3 h-3 bg-inherit border-r border-b border-inherit rotate-45 transform" />
         )}
         {!isLeftPlaced && !isRightPlaced && (
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-inherit border-r-2 border-b-2 border-inherit rotate-45 transform" />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-inherit border-r border-b border-inherit rotate-45 transform" />
         )}
       </div>
     </motion.div>

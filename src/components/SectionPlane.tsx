@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 import { motion, animate, MotionValue } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { STORY_SCENES, SCENE_STEP } from '../data/storyline';
-import { ChevronLeft, ChevronRight, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
+import { ChevronUp, ChevronDown, ArrowLeft, Volume2, VolumeX, FastForward } from 'lucide-react';
 import { dreamAudio } from '../utils/audio';
 
 interface SectionPlaneProps {
   activeSection: number;
   depthValue: MotionValue<number>;
+  fromLetsDrive?: boolean;
 }
 
 /* Tiny paper airplane facing right ---------------------------------------- */
 const TinyPlane = () => (
-  <svg width="28" height="18" viewBox="0 0 56 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="26" height="17" viewBox="0 0 56 36" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="tpTop" x1="0" y1="0" x2="56" y2="0" gradientUnits="userSpaceOnUse">
         <stop offset="0%" stopColor="#e8ecf4"/>
@@ -36,7 +37,7 @@ const TinyPlane = () => (
   </svg>
 );
 
-export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPlaneProps) => {
+export const SectionPlane = React.memo(({ activeSection, depthValue, fromLetsDrive = false }: SectionPlaneProps) => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
 
@@ -61,36 +62,95 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
     goTo(nextIdx);
   };
 
-  return (
-    <header
-      className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-0 right-0 z-40 pointer-events-none px-3 sm:px-6 max-w-5xl mx-auto flex items-center justify-between gap-2 sm:gap-4"
-      aria-label="Storyline navigation"
-    >
-      <h1 className="sr-only">Alif World Journey – Alif Portfolio (Zenox Portfolio)</h1>
-      {/* Top Left Back to World Button */}
-      <motion.button
-        type="button"
-        onClick={() => {
-          dreamAudio.playPop();
-          navigate('/world');
-        }}
-        onMouseEnter={() => dreamAudio.playHover()}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="pointer-events-auto shrink-0 relative overflow-hidden flex items-center gap-1.5 bg-white/85 hover:bg-white backdrop-blur-2xl px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-white/80 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-800 transition-all font-display font-bold text-xs uppercase tracking-wider cursor-pointer"
-        title="Return to World Page"
-        aria-label="Return to World Page"
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
-        <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
-        <span>Back</span>
-      </motion.button>
+  const handleBack = () => {
+    dreamAudio.playPop();
+    if (fromLetsDrive) {
+      dreamAudio.stopJourneyMusic(0.8);
+      navigate('/');
+    } else {
+      navigate('/world');
+    }
+  };
 
-      {/* Track & Flight Path Progress Bar (Center) */}
-      <div className="relative flex-1 min-w-0 max-w-[230px] xs:max-w-[280px] sm:max-w-[460px] flex items-center justify-between pointer-events-auto bg-white/80 hover:bg-white/95 backdrop-blur-2xl px-2 xs:px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-white/60 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
+  const handleSkipToWorld = () => {
+    dreamAudio.playPop();
+    dreamAudio.stopJourneyMusic(0.8);
+    navigate('/world');
+  };
+
+  return (
+    <>
+      {/* ── TOP STORYLINE HEADER ────────────────────────────────────────────── */}
+      <header
+        className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-0 right-0 z-40 pointer-events-none px-3 sm:px-6 w-full flex items-center justify-between"
+        aria-label="Storyline navigation"
+      >
+        <h1 className="sr-only">Alif World Journey – Alif Portfolio (Zenox Portfolio)</h1>
         
-        {/* Previous Button */}
+        {/* Top Left: Back Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+          <motion.button
+            type="button"
+            onClick={handleBack}
+            onMouseEnter={() => dreamAudio.playHover()}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="pointer-events-auto shrink-0 relative overflow-hidden flex items-center gap-1.5 bg-white/85 hover:bg-white backdrop-blur-2xl px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-white/80 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-800 transition-all font-display font-bold text-xs uppercase tracking-wider cursor-pointer"
+            title={fromLetsDrive ? "Return to Landing Page" : "Return to World Page"}
+            aria-label={fromLetsDrive ? "Return to Landing Page" : "Return to World Page"}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
+            <span>Back</span>
+          </motion.button>
+        </div>
+
+        {/* Top Right: Skip Button (Exclusively for journey arrived from LET'S DRIVE) & Soundtrack Mute Toggle */}
+        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+          {fromLetsDrive && (
+            <motion.button
+              type="button"
+              onClick={handleSkipToWorld}
+              onMouseEnter={() => dreamAudio.playHover()}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="pointer-events-auto shrink-0 relative overflow-hidden flex items-center gap-1.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-sky-300/40 shadow-[0_8px_20px_rgba(14,165,233,0.3),inset_0_1px_1px_rgba(255,255,255,0.4)] transition-all font-display font-black text-xs uppercase tracking-wider cursor-pointer"
+              title="Skip to Worlds Page"
+              aria-label="Skip to Worlds Page"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-white/25 via-transparent to-transparent pointer-events-none" />
+              <span>Skip</span>
+              <FastForward className="w-3.5 h-3.5 text-sky-100 shrink-0" />
+            </motion.button>
+          )}
+
+          {/* Soundtrack Mute Toggle */}
+          <motion.button
+            type="button"
+            onClick={toggleSoundtrack}
+            onMouseEnter={() => dreamAudio.playHover()}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            className="pointer-events-auto shrink-0 relative overflow-hidden w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/85 hover:bg-white backdrop-blur-2xl border border-white/70 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-700 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+            title={isMuted ? 'Unmute Soundtrack' : 'Mute Soundtrack'}
+            aria-label={isMuted ? 'Unmute Soundtrack' : 'Mute Soundtrack'}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-slate-400" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
+            )}
+          </motion.button>
+        </div>
+      </header>
+
+      {/* ── VERTICAL FLIGHT PATH PROGRESS BAR (Docked on Right Side - Compact & Sleek) ── */}
+      <nav
+        aria-label="Vertical Storyline Progress"
+        className="fixed right-2 sm:right-4 top-1/2 -translate-y-1/2 z-40 pointer-events-auto flex flex-col items-center justify-between bg-white/85 hover:bg-white/95 backdrop-blur-xl py-1.5 px-1 rounded-full border border-white/80 shadow-[0_8px_25px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] h-[38vh] min-h-[175px] max-h-[235px] transition-all"
+      >
+        {/* Previous Scene Button (Scroll Up) */}
         <button
           type="button"
           onClick={() => {
@@ -99,31 +159,31 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
           }}
           onMouseEnter={() => dreamAudio.playHover()}
           disabled={activeSection === 0}
-          className="p-1 sm:p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-25 disabled:hover:bg-transparent text-slate-700 transition-colors cursor-pointer shrink-0"
+          className="p-0.5 rounded-full hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent text-slate-700 transition-colors cursor-pointer shrink-0"
           title="Previous Scene"
           aria-label="Previous Scene"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronUp className="w-3 h-3" />
         </button>
 
-        {/* Timeline dots container */}
-        <div className="relative flex-1 mx-1.5 xs:mx-2 sm:mx-3 flex items-center justify-between h-5">
-          {/* Connecting Line */}
-          <div className="absolute left-1 right-1 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 rounded-full" />
-          
-          {/* Progress fill */}
-          <motion.div 
-            className="absolute left-1 top-1/2 -translate-y-1/2 h-0.5 bg-sky-500 rounded-full"
-            style={{ 
-              width: `${(activeSection / (STORY_SCENES.length - 1)) * 100}%` 
+        {/* Vertical Timeline Track */}
+        <div className="relative flex-1 my-1 flex flex-col items-center justify-between w-4">
+          {/* Connecting Line Track */}
+          <div className="absolute top-0.5 bottom-0.5 left-1/2 -translate-x-1/2 w-[1px] bg-slate-200 rounded-full" />
+
+          {/* Filled Progress Line */}
+          <motion.div
+            className="absolute top-0.5 left-1/2 -translate-x-1/2 w-[1.5px] bg-sky-500 rounded-full origin-top"
+            style={{
+              height: `${(activeSection / (STORY_SCENES.length - 1)) * 100}%`,
             }}
           />
 
-          {/* Scene Dots: on mobile (< sm) display milestones & active point to prevent cramped collision; on sm: and up show all 16 dots */}
+          {/* 16 Scene Dots */}
           {STORY_SCENES.map((scene, i) => {
             const isActive = activeSection === i;
             const isMilestone = i === 0 || i === 5 || i === 9 || i === 11 || i === 15;
-            
+
             return (
               <button
                 key={scene.id}
@@ -133,40 +193,48 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
                   goTo(i);
                 }}
                 onMouseEnter={() => dreamAudio.playHover()}
-                className={`relative z-10 flex flex-col items-center justify-center p-0.5 focus:outline-none group cursor-pointer ${
-                  !isMilestone && !isActive ? 'hidden sm:flex' : 'flex'
-                }`}
-                aria-label={`Progress point ${i + 1}`}
+                className="relative z-10 flex items-center justify-center p-0 focus:outline-none group cursor-pointer"
+                aria-label={`Jump to scene ${i + 1}: ${scene.title}`}
                 title={`Scene ${i + 1}: ${scene.title}`}
               >
                 <motion.div
                   animate={{
-                    scale: isActive ? 1.4 : isMilestone ? 1.1 : 0.85,
-                    backgroundColor: isActive 
-                      ? '#0284c7' 
-                      : i < activeSection 
-                      ? '#38bdf8' 
+                    scale: isActive ? 1.5 : isMilestone ? 1.2 : 0.9,
+                    backgroundColor: isActive
+                      ? '#0284c7'
+                      : i < activeSection
+                      ? '#38bdf8'
                       : '#cbd5e1',
                   }}
-                  transition={{ duration: 0.25 }}
-                  className={`rounded-full ${isMilestone ? 'w-2 h-2 sm:w-2.5 sm:h-2.5' : 'w-1.5 h-1.5 sm:w-2 sm:h-2'}`}
+                  transition={{ duration: 0.2 }}
+                  className={`rounded-full ${isActive ? 'w-1.5 h-1.5 shadow-[0_0_6px_rgba(2,132,199,0.7)]' : isMilestone ? 'w-1 h-1' : 'w-1 h-1'}`}
                 />
+
+                {/* Hover Tooltip to the Left */}
+                <div className="absolute right-full mr-2 px-2 py-0.5 rounded-md bg-slate-900/90 text-white text-[10px] font-display font-medium tracking-wide whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-md">
+                  Scene {i + 1}: {scene.title}
+                </div>
               </button>
             );
           })}
 
-          {/* Flying Paper Airplane Indicator */}
+          {/* Gliding Paper Airplane Indicator (Oriented along vertical flight path) */}
           <motion.div
-            className="absolute -top-3.5 sm:-top-4 pointer-events-none"
-            animate={{ left: `calc(${(activeSection / (STORY_SCENES.length - 1)) * 100}% - 14px)` }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))' }}
+            className="absolute -left-2 pointer-events-none origin-center"
+            animate={{
+              top: `calc(${(activeSection / (STORY_SCENES.length - 1)) * 100}% - 7px)`,
+            }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.2))',
+              transform: 'rotate(90deg) scale(0.55)',
+            }}
           >
             <TinyPlane />
           </motion.div>
         </div>
 
-        {/* Next Button */}
+        {/* Next Scene Button (Scroll Down) */}
         <button
           type="button"
           onClick={() => {
@@ -175,36 +243,14 @@ export const SectionPlane = React.memo(({ activeSection, depthValue }: SectionPl
           }}
           onMouseEnter={() => dreamAudio.playHover()}
           disabled={activeSection === STORY_SCENES.length - 1}
-          className="p-1 sm:p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-25 disabled:hover:bg-transparent text-slate-700 transition-colors cursor-pointer shrink-0"
+          className="p-0.5 rounded-full hover:bg-slate-100 disabled:opacity-20 disabled:hover:bg-transparent text-slate-700 transition-colors cursor-pointer shrink-0"
           title="Next Scene"
           aria-label="Next Scene"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronDown className="w-3 h-3" />
         </button>
-
-      </div>
-
-      {/* Right Controls: Soundtrack Mute Toggle */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <motion.button
-          type="button"
-          onClick={toggleSoundtrack}
-          onMouseEnter={() => dreamAudio.playHover()}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          className="pointer-events-auto shrink-0 relative overflow-hidden w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/80 hover:bg-white/95 backdrop-blur-2xl border border-white/60 shadow-[0_8px_25px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-700 hover:text-slate-900 transition-all flex items-center justify-center cursor-pointer active:scale-95"
-          title={isMuted ? 'Unmute Soundtrack' : 'Mute Soundtrack'}
-          aria-label={isMuted ? 'Unmute Soundtrack' : 'Mute Soundtrack'}
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-transparent pointer-events-none" />
-          {isMuted ? (
-            <VolumeX className="w-4 h-4 text-slate-400" />
-          ) : (
-            <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
-          )}
-        </motion.button>
-      </div>
-    </header>
+      </nav>
+    </>
   );
 });
 

@@ -2734,49 +2734,10 @@ class SkyAudioPlayer {
       this.worldSkyGain.gain.setValueAtTime(0.001, now);
       this.worldSkyGain.gain.linearRampToValueAtTime(0.09, now + 1.8);
 
-      // 1. High Altitude Organic Sky Wind Stream (Stereo Pink Noise)
-      const bufferSize = this.ctx.sampleRate * 4;
-      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
-        b6 = white * 0.115926;
-      }
-
-      this.worldSkyWind = this.ctx.createBufferSource();
-      this.worldSkyWind.buffer = noiseBuffer;
-      this.worldSkyWind.loop = true;
-
-      const windFilter = this.ctx.createBiquadFilter();
-      windFilter.type = 'bandpass';
-      windFilter.frequency.setValueAtTime(450, now);
-      windFilter.Q.setValueAtTime(1.8, now);
-
-      // Wind breathing LFO
-      const windLfo = this.ctx.createOscillator();
-      windLfo.type = 'sine';
-      windLfo.frequency.setValueAtTime(0.22, now); // ~4.5s breathe cycle
-      const windLfoGain = this.ctx.createGain();
-      windLfoGain.gain.setValueAtTime(180, now);
-      windLfo.connect(windLfoGain);
-      windLfoGain.connect(windFilter.frequency);
-
-      const windVol = this.ctx.createGain();
-      windVol.gain.setValueAtTime(0.38, now);
-      this.worldSkyWind.connect(windFilter);
-      windFilter.connect(windVol);
-      windVol.connect(this.worldSkyGain);
-
-      this.worldSkyWind.start(now);
-      windLfo.start(now);
+      // Sky wind noise stream removed per user request for peaceful world atmosphere
+      this.worldSkyPadGain = this.ctx.createGain();
+      this.worldSkyPadGain.gain.setValueAtTime(0.001, now);
+      this.worldSkyPadGain.gain.linearRampToValueAtTime(0.065, now + 2.0);
 
       // 2. Ethereal Celestial Sky Pad (Dmaj9 - Gmaj7 open harmony)
       this.worldSkyPadGain = this.ctx.createGain();
@@ -2923,67 +2884,13 @@ class SkyAudioPlayer {
     } catch {}
   }
 
-  // ── AIR WAVE WHOOSH SOUND EFFECT (Stereo sweeping wind gust) ────────────────
-  public playAirWaveWhoosh(direction: 'left-to-right' | 'right-to-left' = 'left-to-right'): void {
-    if (this.isMuted) return;
-    this.initContext();
-    if (!this.ctx) return;
-
-    try {
-      const now = this.ctx.currentTime;
-      const duration = 2.4;
-
-      // Noise source for the wind gust
-      const bufferSize = Math.floor(this.ctx.sampleRate * duration);
-      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = noiseBuffer.getChannelData(0);
-      let lastVal = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        lastVal = (lastVal + (0.04 * white)) / 1.04;
-        data[i] = lastVal * 2.8;
-      }
-
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = noiseBuffer;
-
-      // Sweeping resonant bandpass filter
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(260, now);
-      filter.frequency.linearRampToValueAtTime(750, now + duration * 0.45);
-      filter.frequency.exponentialRampToValueAtTime(220, now + duration);
-      filter.Q.setValueAtTime(2.8, now);
-
-      // Stereo Panner (if available) for spatial sound passing left-to-right or right-to-left
-      let panner: StereoPannerNode | null = null;
-      if (typeof this.ctx.createStereoPanner === 'function') {
-        panner = this.ctx.createStereoPanner();
-        const startPan = direction === 'left-to-right' ? -0.85 : 0.85;
-        const endPan = direction === 'left-to-right' ? 0.85 : -0.85;
-        panner.pan.setValueAtTime(startPan, now);
-        panner.pan.linearRampToValueAtTime(endPan, now + duration);
-      }
-
-      // Smooth volume swell curve
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.09, now + duration * 0.4);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-      noise.connect(filter);
-      if (panner) {
-        filter.connect(panner);
-        panner.connect(gain);
-      } else {
-        filter.connect(gain);
-      }
-      gain.connect(this.ctx.destination);
-
-      noise.start(now);
-      noise.stop(now + duration + 0.1);
-    } catch {}
+  // ── AIR WAVE WHOOSH SOUND EFFECT (Removed as requested) ────────────────
+  public playAirWaveWhoosh(_direction: 'left-to-right' | 'right-to-left' = 'left-to-right'): void {
+    // Air sound effects removed per user request
+    return;
   }
+
+
 
   // Soft aquatic fish tail swish
   public playFishTailSwish(): void {

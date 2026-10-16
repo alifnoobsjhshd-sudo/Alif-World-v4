@@ -11,6 +11,7 @@ interface StorySceneViewProps {
   scene: StoryScene;
   onOpenContact?: () => void;
   onExploreWork?: () => void;
+  fromLetsDrive?: boolean;
 }
 
 function getTopBubbleOffset(bubblePlacement: string): string {
@@ -29,7 +30,7 @@ function getTopBubbleOffset(bubblePlacement: string): string {
   }
 }
 
-export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene, onOpenContact, onExploreWork }) => {
+export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene, onOpenContact, onExploreWork, fromLetsDrive = false }) => {
   const navigate = useNavigate();
   const isReveal = scene.id === 16;
 
@@ -54,6 +55,12 @@ export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene
     scene.bubblePlacement === 'above-behind' || 
     scene.bubblePlacement === 'behind-stretching' || 
     scene.bubblePlacement === 'wind-tilted';
+
+  const handleContinueToWorld = () => {
+    dreamAudio.playPop();
+    dreamAudio.stopJourneyMusic(0.8);
+    navigate('/world');
+  };
 
   return (
     <div className="relative flex flex-col items-center justify-center w-full max-w-4xl px-4 select-none">
@@ -103,53 +110,67 @@ export const StorySceneView: React.FC<StorySceneViewProps> = React.memo(({ scene
               A develop, &ldquo; Making my imagination real&rdquo;
             </p>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-4 pointer-events-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  dreamAudio.playPop();
-                  if (onExploreWork) {
-                    onExploreWork();
-                  } else {
-                    navigate('/explore-works');
-                  }
-                }}
-                onMouseEnter={() => dreamAudio.playHover()}
-                className="px-6 sm:px-8 py-3.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-display font-black text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer border border-slate-800"
-              >
-                <Compass className="w-5 h-5 text-sky-400" />
-                <span>Explore Work</span>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-              </button>
+            {/* Action Buttons: If reached via LET'S DRIVE, show ONLY Continue button */}
+            {fromLetsDrive ? (
+              <div className="flex items-center justify-center pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={handleContinueToWorld}
+                  onMouseEnter={() => dreamAudio.playHover()}
+                  className="px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-sky-500 via-indigo-600 to-sky-600 hover:from-sky-400 hover:to-indigo-500 text-white font-display font-black text-base sm:text-lg shadow-[0_12px_32px_rgba(14,165,233,0.45)] hover:shadow-2xl transition-all duration-200 flex items-center gap-2.5 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer border border-sky-300/40"
+                >
+                  <span>Continue</span>
+                  <ArrowRight className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-4 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    dreamAudio.playPop();
+                    if (onExploreWork) {
+                      onExploreWork();
+                    } else {
+                      navigate('/explore-works');
+                    }
+                  }}
+                  onMouseEnter={() => dreamAudio.playHover()}
+                  className="px-6 sm:px-8 py-3.5 rounded-2xl bg-slate-900 hover:bg-black text-white font-display font-black text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer border border-slate-800"
+                >
+                  <Compass className="w-5 h-5 text-sky-400" />
+                  <span>Explore Work</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  dreamAudio.playPop();
-                  dreamAudio.stopJourneyMusic(0.8);
-                  navigate('/about');
-                }}
-                onMouseEnter={() => dreamAudio.playHover()}
-                className="px-6 sm:px-8 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-display font-black text-base sm:text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <User className="w-5 h-5 text-slate-950" />
-                <span>About Me</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dreamAudio.playPop();
+                    dreamAudio.stopJourneyMusic(0.8);
+                    navigate('/about');
+                  }}
+                  onMouseEnter={() => dreamAudio.playHover()}
+                  className="px-6 sm:px-8 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-display font-black text-base sm:text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                >
+                  <User className="w-5 h-5 text-slate-950" />
+                  <span>About Me</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  dreamAudio.playChime();
-                  onOpenContact?.();
-                }}
-                onMouseEnter={() => dreamAudio.playHover()}
-                className="px-6 sm:px-8 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 font-display font-black text-base sm:text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 border-2 border-slate-200 hover:border-slate-400 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-              >
-                <Mail className="w-5 h-5 text-sky-600" />
-                <span>Contact Me</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dreamAudio.playChime();
+                    onOpenContact?.();
+                  }}
+                  onMouseEnter={() => dreamAudio.playHover()}
+                  className="px-6 sm:px-8 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 font-display font-black text-base sm:text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 border-2 border-slate-200 hover:border-slate-400 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                >
+                  <Mail className="w-5 h-5 text-sky-600" />
+                  <span>Contact Me</span>
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 

@@ -61,7 +61,7 @@ export const Section = React.memo(({
     >
       <motion.div 
         style={{ pointerEvents }}
-        className="w-full flex items-center justify-center md:scale-[0.88] lg:scale-[0.85] origin-center"
+        className="w-full flex items-center justify-center origin-center"
       >
         {children}
       </motion.div>

@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'motion/react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 
 // Visual assets
-import worldSkyBg from '../assets/images/sky_mountain_realm_1790820082936.jpg';
+import worldBoardBgRemote from '../assets/images/sky_mountain_realm_1790820082936.jpg'; // fallback
 import islandStoryImg from '../assets/images/islands/island_story_trimmed.png';
 import islandAboutImg from '../assets/images/islands/island_about_trimmed.png';
 import islandWorksImg from '../assets/images/islands/island_works_trimmed.png';
@@ -21,6 +17,9 @@ import {
   WorksRocketLaunchTransition,
 } from '../components/WorldTransitions';
 
+const WOOD_BOARD_BG_URL = 'https://i.postimg.cc/FHBPzSP2/d28f364d-caca-44e7-a29a-a2f431d6bbf4.jpg';
+const WOOD_BOARD_LOCAL_URL = '/world-wood-board.jpg';
+
 export const WorldPage: React.FC = () => {
   const navigate = useNavigate();
   const clusterRef = useRef<HTMLDivElement>(null);
@@ -28,6 +27,7 @@ export const WorldPage: React.FC = () => {
   const worksIslandRef = useRef<HTMLDivElement>(null);
   const aboutIslandRef = useRef<HTMLDivElement>(null);
   const hoveredIslandRef = useRef<'story' | 'about' | 'works' | null>(null);
+
   const [zoomingIsland, setZoomingIsland] = useState<'story' | 'about' | 'works' | null>(null);
   const [activeTransition, setActiveTransition] = useState<'story' | 'about' | 'works' | null>(null);
   const [zoomOrigin, setZoomOrigin] = useState<string>('50% 50%');
@@ -35,6 +35,7 @@ export const WorldPage: React.FC = () => {
   const [hoveredIsland, setHoveredIsland] = useState<'story' | 'about' | 'works' | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [isEntering, setIsEntering] = useState(true);
+  const [bgSrc, setBgSrc] = useState(WOOD_BOARD_LOCAL_URL);
 
   // Responsive tracker
   useEffect(() => {
@@ -46,31 +47,25 @@ export const WorldPage: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ── Continuous 3D Parallax Tracking via Mouse Movement (For PC) ────────────
+  // ── Unified 3D Parallax Tracking via Mouse Movement ──
+  // Per user request:
+  // "make island not floating they are hardly stick with the board.
+  // So in mouse cursor movement it will move the background with all elements above the board exactly like landing page.
+  // Make sure it will little less move farther than landing page and will have little delay on moving."
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // Spring physics for smooth responsive cursor tracking
-  const springX = useSpring(mouseX, { stiffness: 65, damping: 22, mass: 0.5 });
-  const springY = useSpring(mouseY, { stiffness: 65, damping: 22, mass: 0.5 });
+  // Softer stiffness & higher damping + higher mass for the requested slight delay & smooth weighted drift:
+  const springX = useSpring(mouseX, { stiffness: 42, damping: 25, mass: 0.85 });
+  const springY = useSpring(mouseY, { stiffness: 42, damping: 25, mass: 0.85 });
 
-  // Sky background dynamic 3D parallax (Diorama depth for Desktop)
-  const bgX = useTransform(springX, [-1, 1], [-26, 26]);
-  const bgY = useTransform(springY, [-1, 1], [-18, 18]);
-  const bgRotX = useTransform(springY, [-1, 1], [-3.8, 3.8]);
-  const bgRotY = useTransform(springX, [-1, 1], [4.2, -4.2]);
+  // Move slightly less farther than landing page (Landing page is [32, -32] and [22, -22]):
+  const sceneX = useTransform(springX, [-1, 1], [22, -22]);
+  const sceneY = useTransform(springY, [-1, 1], [15, -15]);
+  const sceneRotY = useTransform(springX, [-1, 1], [-3.2, 3.2]);
+  const sceneRotX = useTransform(springY, [-1, 1], [2.8, -2.8]);
 
-  // Floating Island 3D tilt & dramatic stereoscopic shift
-  const islandClusterX = useTransform(springX, [-1, 1], [-38, 38]);
-  const islandClusterY = useTransform(springY, [-1, 1], [-26, 26]);
-  const islandRotX = useTransform(springY, [-1, 1], [8.5, -8.5]);
-  const islandRotY = useTransform(springX, [-1, 1], [-9.5, 9.5]);
-
-  // Dynamic Celestial Light coordinates following cursor across sky
-  const cursorAuroraX = useTransform(springX, [-1, 1], [25, 75]);
-  const cursorAuroraY = useTransform(springY, [-1, 1], [20, 80]);
-
-  // Special Celestial Sky Music & Air Waves Soundscape Lifecycle
+  // Peaceful World Theme Background Music (Airflows and air sound effects removed per request)
   useEffect(() => {
     dreamAudio.startWorldSkyMusic();
 
@@ -92,8 +87,9 @@ export const WorldPage: React.FC = () => {
   useEffect(() => {
     const handleMove = (x: number, y: number) => {
       const { innerWidth, innerHeight } = window;
-      const normX = (x / innerWidth) * 2 - 1;
-      const normY = (y / innerHeight) * 2 - 1;
+      if (!innerWidth || !innerHeight) return;
+      const normX = (x / innerWidth - 0.5) * 2;
+      const normY = (y / innerHeight - 0.5) * 2;
       mouseX.set(normX);
       mouseY.set(normY);
 
@@ -144,9 +140,9 @@ export const WorldPage: React.FC = () => {
 
   // Audio Toggle
   const toggleAudio = () => {
-    const muted = dreamAudio.toggleMute();
-    setIsMuted(muted);
-    if (!muted) {
+    const next = dreamAudio.toggleMute();
+    setIsMuted(next);
+    if (!next) {
       dreamAudio.playPop();
       dreamAudio.startWorldSkyMusic();
     } else {
@@ -159,8 +155,6 @@ export const WorldPage: React.FC = () => {
     if (zoomingIsland || activeTransition) return;
     dreamAudio.playDreamRipple();
 
-    // Anchor the camera on the selected island's center, not the exact point
-    // within its artwork or label where the pointer happened to land.
     const cluster = clusterRef.current;
     const islandRef = {
       story: storyIslandRef,
@@ -207,13 +201,13 @@ export const WorldPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-slate-900 select-none flex flex-col justify-between touch-none overscroll-none">
+    <div className="relative w-full h-full overflow-hidden bg-[#241a15] select-none flex flex-col justify-between touch-none overscroll-none">
       <SEO
-        title="Alif's Dream Realm · Floating Islands"
-        description="Explore Alif's 3 connected floating sky islands: The Story, More About Him, and My Works."
+        title="Alif's Dream Realm · Story Board"
+        description="Explore Alif's 3 connected level islands pinned to the cork notice board: The Story, More About Him, and My Works."
       />
 
-      {/* ── 1. ENTRANCE REVEAL: SOFT TRANSPARENT CLOUDS PARTING LEFT & RIGHT ── */}
+      {/* ── 1. ENTRANCE REVEAL: SOFT CLOUDS PARTING LEFT & RIGHT ── */}
       {isEntering && (
         <motion.div
           initial={{ opacity: 1 }}
@@ -222,7 +216,7 @@ export const WorldPage: React.FC = () => {
           onAnimationComplete={() => setIsEntering(false)}
           className="fixed inset-0 z-50 pointer-events-none overflow-hidden flex items-center justify-between"
         >
-          {/* Left Cloud Bank: Drifting and sliding away to the left */}
+          {/* Left Cloud Bank */}
           <motion.div
             initial={{ x: 0 }}
             animate={{ x: '-115%' }}
@@ -235,7 +229,7 @@ export const WorldPage: React.FC = () => {
             <div className="w-full h-full bg-gradient-to-r from-white/95 via-white/80 to-transparent" />
           </motion.div>
 
-          {/* Right Cloud Bank: Drifting and sliding away to the right */}
+          {/* Right Cloud Bank */}
           <motion.div
             initial={{ x: 0 }}
             animate={{ x: '115%' }}
@@ -249,96 +243,6 @@ export const WorldPage: React.FC = () => {
           </motion.div>
         </motion.div>
       )}
-
-      {/* ── CINEMATIC SKY BACKGROUND (DYNAMIC 3D PARALLAX & CURSOR AURORA) ── */}
-      <motion.div
-        style={{
-          x: isDesktop ? bgX : 0,
-          y: isDesktop ? bgY : 0,
-          rotateX: isDesktop ? bgRotX : 0,
-          rotateY: isDesktop ? bgRotY : 0,
-          scale: 1.09,
-          transformStyle: 'preserve-3d',
-        }}
-        className="absolute inset-0 pointer-events-none z-0 will-change-transform"
-      >
-        <img
-          src={worldSkyBg}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = '/world-sky-bg.jpg';
-          }}
-          alt="Celestial Sky Realm"
-          className="w-full h-full object-cover object-center"
-        />
-
-        {/* Dynamic Celestial Aurora / Sunlight Caustic Beam (Desktop only) */}
-        {isDesktop && (
-          <motion.div
-            className="absolute inset-0 pointer-events-none mix-blend-soft-light transition-opacity duration-300"
-            style={{
-              background: useTransform(
-                [cursorAuroraX, cursorAuroraY],
-                ([x, y]) => `radial-gradient(900px circle at ${x}% ${y}%, rgba(186, 230, 254, 0.28), transparent 75%)`
-              ),
-            }}
-          />
-        )}
-
-        {/* Ethereal atmosphere lighting (Sun removed as requested) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-sky-400/20 via-sky-600/10 to-indigo-950/45 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-sky-900/15" />
-      </motion.div>
-
-      {/* ── ANIMATED AIR WAVES & WIND CURRENTS RIPPLES IN THE SKY ─────────────── */}
-      <AnimatedAirWaves />
-
-      {/* ── DRIFTING SKY CLOUDS & FLYING CRANES ───────────────────────────────── */}
-      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-        {/* Upper soft billowing cloud bank */}
-        <motion.div
-          className="absolute -top-12 -left-[20%] w-[140%] h-40 opacity-70 flex justify-around"
-          animate={{ x: [-35, 35, -35] }}
-          transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <div className="w-80 h-32 rounded-full bg-white/70 blur-2xl" />
-          <div className="w-[480px] h-40 rounded-full bg-white/80 blur-3xl" />
-          <div className="w-72 h-28 rounded-full bg-white/60 blur-2xl" />
-        </motion.div>
-
-        {/* Mid-sky drifting fluff clouds */}
-        <motion.div
-          className="absolute top-[22%] -left-32 w-64 h-20 rounded-full bg-white/45 blur-xl"
-          animate={{ x: [0, window.innerWidth + 200] }}
-          transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-        />
-        <motion.div
-          className="absolute top-[68%] -left-48 w-80 h-24 rounded-full bg-white/40 blur-2xl"
-          animate={{ x: [0, window.innerWidth + 300] }}
-          transition={{ duration: 52, repeat: Infinity, ease: 'linear', delay: 10 }}
-        />
-
-        {/* Flocks of Flying Cranes with Flapping Wings gliding across sky */}
-        <motion.div
-          className="absolute top-[14%] -left-20 flex items-center gap-6"
-          animate={{
-            x: ['-10vw', '115vw'],
-            y: [0, -30, 15, -20, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
-        >
-          <FlyingCrane scale={0.85} delay={0} />
-          <div className="-mt-6">
-            <FlyingCrane scale={0.65} delay={0.2} />
-          </div>
-          <div className="mt-5">
-            <FlyingCrane scale={0.6} delay={0.4} />
-          </div>
-        </motion.div>
-      </div>
 
       {/* ── TOP NAVIGATION BAR (Transparent Overlay: "Back" & Sound Only) ─────────────── */}
       <header className="absolute top-0 inset-x-0 z-40 flex items-center justify-between px-4 sm:px-8 pt-3 sm:pt-4 pb-2 pointer-events-none w-full bg-transparent">
@@ -374,278 +278,295 @@ export const WorldPage: React.FC = () => {
             aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
           >
             {isMuted ? (
-              <VolumeX className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+              <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
             ) : (
-              <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
+              <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 animate-pulse" />
             )}
           </MagneticShimmerButton>
         </div>
       </header>
 
-      {/* ── CENTER: 3 SEPARATE FLOATING ISLANDS (LIFTED VERTICALLY FOR CLEAN PROFESSIONAL VIBE) ───── */}
-      <main
-        className="relative flex-1 w-full h-full flex items-center justify-center p-2 sm:p-4 overflow-visible z-20"
-        style={{ perspective: isDesktop ? '1200px' : 'none' }}
+      {/* ── UNIFIED 3D STAGE: WOOD BOARD BACKGROUND + ISLANDS HARDLY PINNED TO BOARD ── */}
+      {/* Both the board and the islands move together under mouse parallax with slight delay & scaled travel */}
+      <div
+        className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden z-10"
+        style={{ perspective: isDesktop ? '1100px' : 'none' }}
       >
         <motion.div
-          ref={clusterRef}
           style={{
-            x: isDesktop && !zoomingIsland ? islandClusterX : 0,
-            y: isDesktop && !zoomingIsland ? islandClusterY : 0,
-            rotateX: isDesktop && !zoomingIsland ? islandRotX : 0,
-            rotateY: isDesktop && !zoomingIsland ? islandRotY : 0,
-            transformOrigin: zoomOrigin,
+            x: isDesktop ? sceneX : 0,
+            y: isDesktop ? sceneY : 0,
+            rotateX: isDesktop ? sceneRotX : 0,
+            rotateY: isDesktop ? sceneRotY : 0,
+            transformStyle: 'preserve-3d',
+            scale: isDesktop ? 1.09 : 1.08,
           }}
-          animate={
-            zoomingIsland
-              ? {
-                  scale: 3.2,
-                }
-              : {
-                  scale: 1.0,
-                  y: 0,
-                  rotate: 0,
-                }
-          }
-          transition={
-            zoomingIsland
-              ? {
-                  scale: { duration: 0.52, ease: [0.35, 0, 0.65, 0] },
-                }
-              : {
-                  duration: 0.3,
-                }
-          }
-          className="relative w-full max-w-4xl lg:max-w-6xl h-[72vh] min-h-[500px] max-h-[700px] flex items-center justify-center will-change-transform pointer-events-auto -translate-y-5 lg:-translate-y-7 xl:-translate-y-9"
+          className="relative w-full h-full flex items-center justify-center will-change-transform"
         >
-          {/* Mobile Connecting Paths Only (Desktop Black Lines Removed As Requested) */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none z-10 lg:hidden overflow-visible"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            {/* Storybook Whimsical Dashed Curve: The Story (36, 17) -> About Me (68, 44) */}
-            <path
-              d="M 36 17 C 42 21, 48 29, 44 33 C 40 37, 56 40, 68 44"
-              fill="none"
-              stroke="#0f172a"
-              strokeWidth="0.7"
-              strokeLinecap="round"
-              strokeDasharray="3.5 2.5"
-              opacity="0.9"
+          {/* ── 2. NEW WOOD BOARD BACKGROUND (Requested image with bleed margins to prevent cutting) ── */}
+          <div className="absolute -inset-10 sm:-inset-16 w-[calc(100%+5rem)] sm:w-[calc(100%+8rem)] h-[calc(100%+5rem)] sm:h-[calc(100%+8rem)] pointer-events-none select-none z-0 overflow-hidden">
+            <img
+              src={bgSrc}
+              onError={() => {
+                if (bgSrc === WOOD_BOARD_LOCAL_URL) {
+                  setBgSrc(WOOD_BOARD_BG_URL);
+                } else {
+                  setBgSrc(worldBoardBgRemote);
+                }
+              }}
+              alt="Room Cork Notice Board"
+              className="w-full h-full object-cover object-center scale-105 transform-gpu"
+              style={{ transform: 'translateZ(0px)' }}
             />
-
-            {/* Storybook Whimsical Dashed Curve: About Me (68, 44) -> My Works (34, 74) */}
-            <path
-              d="M 68 44 C 64 54, 52 54, 56 62 C 60 70, 46 72, 34 74"
-              fill="none"
-              stroke="#0f172a"
-              strokeWidth="0.7"
-              strokeLinecap="round"
-              strokeDasharray="3.5 2.5"
-              opacity="0.9"
-            />
-
-            {/* Delicate Waypoint Story Pins */}
-            <circle cx="36" cy="17" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="68" cy="44" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-            <circle cx="34" cy="74" r="1.2" fill="#0f172a" stroke="#ffffff" strokeWidth="0.5" />
-          </svg>
-
-          {/* ══════════════════════════════════════════════════════════════════
-              ISLAND 1: "THE STORY" (GRAND HERO ISLAND - PROMINENT & BIGGER)
-              - Desktop: Top-Center (Lifted up)
-              - Mobile: Top-Center (Lifted up)
-             ══════════════════════════════════════════════════════════════════ */}
-          <div
-            ref={storyIslandRef}
-            onClick={() => handleIslandClick('story')}
-            onMouseEnter={() => {
-              setHoveredIsland('story');
-              dreamAudio.playHover();
-            }}
-            onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute top-[0%] left-[36%] -translate-x-1/2 lg:top-[2%] lg:left-[50%] lg:-translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
-            title="The Story · Click to Explore"
-          >
-            {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
-            <motion.div
-              animate={{
-                y: [-3.5, 3.5, -3.5],
-                rotate: [-0.4, 0.4, -0.4],
-              }}
-              transition={{
-                duration: 7.2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.96 }}
-              className="relative flex flex-col items-center"
-            >
-              {/* Theme Color Glow from Background (Rose) - Gentle, natural, professional ambient glow */}
-              <div
-                className={`absolute inset-[-8%] rounded-full bg-rose-400/20 blur-2xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'story' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
-                }`}
-              />
-
-              {/* Story Island: Prominent Hero Size (Larger than other islands) */}
-              <img
-                src={islandStoryImg}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/islands/island_story.png';
-                }}
-                alt="The Story Floating Island"
-                className="w-[160px] xs:w-[175px] sm:w-[215px] lg:w-[280px] xl:w-[310px] h-auto object-contain pointer-events-none drop-shadow-[0_16px_28px_rgba(15,23,42,0.65)] select-none"
-              />
-
-              {/* Refined Proportional Title Text */}
-              <motion.span
-                animate={{
-                  y: hoveredIsland === 'story' ? -2 : 0,
-                  scale: hoveredIsland === 'story' ? 1.05 : 1.0,
-                }}
-                transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider uppercase text-rose-200 drop-shadow-[0_1px_8px_rgba(244,63,94,0.6)] group-hover:text-white transition-colors"
-              >
-                The Story
-              </motion.span>
-            </motion.div>
+            {/* Gentle warm room ambient gradient overlay */}
+            <div className="absolute inset-0 bg-amber-950/10 pointer-events-none mix-blend-multiply" />
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════════
-              ISLAND 2: "MY WORKS" (Purple Theme)
-              - Desktop: Bottom-Left (Lifted up for balanced professional spacing)
-              - Mobile: Bottom-Left (Lifted up)
-              ══════════════════════════════════════════════════════════════════ */}
-          <div
-            ref={worksIslandRef}
-            onClick={() => handleIslandClick('works')}
-            onMouseEnter={() => {
-              setHoveredIsland('works');
-              dreamAudio.playHover();
+          {/* ── 3. CORK BOARD AREA WITH PINNED LEVEL ISLANDS & NON-STRAIGHT CONNECTING LINE ── */}
+          {/*
+              The cork inner area on desktop spans:
+              left: ~26%, top: ~11%, width: ~52%, height: ~76%
+              On mobile/landscape, nicely proportioned across board face.
+          */}
+          <motion.div
+            ref={clusterRef}
+            style={{
+              transformOrigin: zoomOrigin,
+              transform: 'translateZ(18px)', // Hardly stuck right on top of board with slight 3D elevation
             }}
-            onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute bottom-[8%] left-[6%] lg:bottom-[15%] lg:left-[4%] lg:top-auto lg:right-auto z-20 cursor-pointer group flex flex-col items-center select-none"
-            title="My Works · Click to Explore"
+            animate={
+              zoomingIsland
+                ? {
+                    scale: 3.1,
+                  }
+                : {
+                    scale: 1.0,
+                  }
+            }
+            transition={
+              zoomingIsland
+                ? {
+                    scale: { duration: 0.52, ease: [0.35, 0, 0.65, 0] },
+                  }
+                : {
+                    duration: 0.3,
+                  }
+            }
+            className="absolute left-[26%] top-[11.5%] w-[51%] h-[74%] min-w-[280px] pointer-events-auto z-20 flex items-center justify-center"
           >
-            {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
-            <motion.div
-              animate={{
-                y: [-3, 3.5, -3],
-                rotate: [-0.35, 0.45, -0.35],
-              }}
-              transition={{
-                duration: 7.8,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: 1.4,
-              }}
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.96 }}
-              className="relative flex flex-col items-center"
+            {/* ── NON-STRAIGHT LIGHT WOOD STORY LEVEL CONNECTING PATH ── */}
+            {/* Sequence: Level 1 (The Story, top-center) -> Level 2 (About Me, mid-right) -> Level 3 (My Works, bottom-left) */}
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
             >
-              {/* Theme Color Glow from Background (Purple) - Gentle, natural, professional ambient glow */}
-              <div
-                className={`absolute inset-[-8%] rounded-full bg-purple-500/22 blur-2xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'works' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
-                }`}
+              <defs>
+                <filter id="woodShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="1.2" stdDeviation="0.8" floodColor="#2e1808" floodOpacity="0.7" />
+                </filter>
+              </defs>
+
+              {/* Segment 1: Story (X=40, Y=24) -> About Me (X=78, Y=46) */}
+              {/* Whimsical curving path in authentic light wood tone */}
+              <path
+                d="M 40 24 C 56 18, 68 30, 78 46"
+                fill="none"
+                stroke="#e8c39e"
+                strokeWidth="0.95"
+                strokeLinecap="round"
+                strokeDasharray="2.8 2.2"
+                filter="url(#woodShadow)"
+                opacity="0.95"
               />
 
-              {/* My Works Island Cutout Image */}
-              <img
-                src={islandWorksImg}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/islands/island_works.png';
-                }}
-                alt="My Works Floating Island"
-                className="w-[120px] xs:w-[135px] sm:w-[160px] lg:w-[210px] xl:w-[235px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
+              {/* Segment 2: About Me (X=78, Y=56) -> My Works (X=24, Y=70) */}
+              {/* Whimsical curving route across the wooden board */}
+              <path
+                d="M 76 56 C 70 72, 44 64, 24 70"
+                fill="none"
+                stroke="#e8c39e"
+                strokeWidth="0.95"
+                strokeLinecap="round"
+                strokeDasharray="2.8 2.2"
+                filter="url(#woodShadow)"
+                opacity="0.95"
               />
 
-              {/* Refined Proportional Title Text (Purple Theme) */}
-              <motion.span
-                animate={{
-                  y: hoveredIsland === 'works' ? -2 : 0,
-                  scale: hoveredIsland === 'works' ? 1.05 : 1.0,
-                }}
-                transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-purple-300 drop-shadow-[0_1px_8px_rgba(168,85,247,0.6)] group-hover:text-purple-100 transition-colors"
-              >
-                My Works
-              </motion.span>
-            </motion.div>
-          </div>
+              {/* Level Pushpins on the board marking each station in order */}
+              {/* Start: The Story Pin (LVL 1) */}
+              <circle cx="40" cy="24" r="1.4" fill="#f43f5e" stroke="#fae8d8" strokeWidth="0.5" filter="url(#woodShadow)" />
+              <circle cx="40" cy="24" r="0.6" fill="#881337" />
 
-          {/* ══════════════════════════════════════════════════════════════════
-              ISLAND 3: "ABOUT ME" / "MORE ABOUT HIM"
-              - Desktop: Bottom-Right (Lifted up for balanced professional spacing)
-              - Mobile: Middle-Right (Lifted up)
-              ══════════════════════════════════════════════════════════════════ */}
-          <div
-            ref={aboutIslandRef}
-            onClick={() => handleIslandClick('about')}
-            onMouseEnter={() => {
-              setHoveredIsland('about');
-              dreamAudio.playHover();
-            }}
-            onMouseLeave={() => setHoveredIsland(null)}
-            className="absolute top-[32%] right-[6%] lg:top-auto lg:bottom-[15%] lg:right-[4%] lg:left-auto z-20 cursor-pointer group flex flex-col items-center select-none"
-            title="More About Him · Click to Explore"
-          >
-            {/* Gentle, Subtle, Professional Micro-Float (Dampened & Refined) */}
-            <motion.div
-              animate={{
-                y: [3.5, -3, 3.5],
-                rotate: [0.4, -0.35, 0.4],
+              {/* Middle: About Me Pin (LVL 2) */}
+              <circle cx="78" cy="46" r="1.4" fill="#06b6d4" stroke="#fae8d8" strokeWidth="0.5" filter="url(#woodShadow)" />
+              <circle cx="78" cy="46" r="0.6" fill="#164e63" />
+
+              {/* End: My Works Pin (LVL 3) */}
+              <circle cx="24" cy="70" r="1.4" fill="#a855f7" stroke="#fae8d8" strokeWidth="0.5" filter="url(#woodShadow)" />
+              <circle cx="24" cy="70" r="0.6" fill="#1e1b4b" />
+            </svg>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                LEVEL 3: "MY WORKS" (Purple Theme · Bottom-Left of board)
+                Hardly stuck to board: zero floating animation
+                ══════════════════════════════════════════════════════════════════ */}
+            <div
+              ref={worksIslandRef}
+              onClick={() => handleIslandClick('works')}
+              onMouseEnter={() => {
+                setHoveredIsland('works');
+                dreamAudio.playHover();
               }}
-              transition={{
-                duration: 8.2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: 0.9,
-              }}
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.96 }}
-              className="relative flex flex-col items-center"
+              onMouseLeave={() => setHoveredIsland(null)}
+              className="absolute left-[4%] bottom-[6%] z-20 cursor-pointer group flex flex-col items-center select-none"
+              title="My Works · Click to Explore"
             >
-              {/* Theme Color Glow from Background (Cyan) - Gentle, natural, professional ambient glow */}
-              <div
-                className={`absolute inset-[-8%] rounded-full bg-sky-400/22 blur-2xl pointer-events-none transition-all duration-500 ${
-                  hoveredIsland === 'about' ? 'opacity-100 scale-110' : 'opacity-0 scale-95'
-                }`}
-              />
-
-              {/* About Me Island Cutout Image */}
-              <img
-                src={islandAboutImg}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/islands/island_about.png';
-                }}
-                alt="About Me Floating Island"
-                className="w-[125px] xs:w-[140px] sm:w-[165px] lg:w-[215px] xl:w-[240px] h-auto object-contain pointer-events-none drop-shadow-[0_14px_24px_rgba(15,23,42,0.6)] select-none"
-              />
-
-              {/* Refined Proportional Title Text */}
-              <motion.span
-                animate={{
-                  y: hoveredIsland === 'about' ? -2 : 0,
-                  scale: hoveredIsland === 'about' ? 1.05 : 1.0,
-                }}
-                transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                className="mt-1 font-display font-black text-[11px] sm:text-xs lg:text-sm tracking-wider uppercase text-cyan-200 drop-shadow-[0_1px_8px_rgba(6,182,212,0.6)] group-hover:text-white transition-colors"
+              {/* Stationary firmly stuck container */}
+              <motion.div
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative flex flex-col items-center"
               >
-                More About Him
-              </motion.span>
-            </motion.div>
-          </div>
+                {/* Theme Color Glow (Purple) */}
+                <div
+                  className={`absolute inset-[-8%] rounded-full bg-purple-500/22 blur-xl pointer-events-none transition-all duration-300 ${
+                    hoveredIsland === 'works' ? 'opacity-100 scale-105' : 'opacity-0 scale-95'
+                  }`}
+                />
+
+                {/* My Works Island Image firmly attached */}
+                <img
+                  src={islandWorksImg}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/islands/island_works.png';
+                  }}
+                  alt="My Works Island"
+                  className="w-[96px] xs:w-[108px] sm:w-[122px] lg:w-[132px] xl:w-[144px] h-auto object-contain pointer-events-none drop-shadow-[0_10px_16px_rgba(20,10,5,0.7)] select-none"
+                />
+
+                {/* Title Text */}
+                <motion.span
+                  animate={{
+                    y: hoveredIsland === 'works' ? -2 : 0,
+                    scale: hoveredIsland === 'works' ? 1.05 : 1.0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                  className="mt-1 font-display font-black text-[10px] sm:text-[11px] lg:text-xs tracking-wider uppercase text-purple-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] group-hover:text-purple-100 transition-colors"
+                >
+                  My Works
+                </motion.span>
+              </motion.div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                "THE STORY" (Grand Story Island · Upper Center of board)
+                Hardly stuck to board: zero floating animation
+                ══════════════════════════════════════════════════════════════════ */}
+            <div
+              ref={storyIslandRef}
+              onClick={() => handleIslandClick('story')}
+              onMouseEnter={() => {
+                setHoveredIsland('story');
+                dreamAudio.playHover();
+              }}
+              onMouseLeave={() => setHoveredIsland(null)}
+              className="absolute left-[38%] top-[2%] -translate-x-1/2 z-20 cursor-pointer group flex flex-col items-center select-none"
+              title="The Story · Click to Explore"
+            >
+              {/* Stationary firmly stuck container */}
+              <motion.div
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative flex flex-col items-center"
+              >
+                {/* Theme Color Glow (Rose) */}
+                <div
+                  className={`absolute inset-[-8%] rounded-full bg-rose-400/22 blur-xl pointer-events-none transition-all duration-300 ${
+                    hoveredIsland === 'story' ? 'opacity-100 scale-105' : 'opacity-0 scale-95'
+                  }`}
+                />
+
+                {/* Story Island Image firmly attached */}
+                <img
+                  src={islandStoryImg}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/islands/island_story.png';
+                  }}
+                  alt="The Story Island"
+                  className="w-[125px] xs:w-[138px] sm:w-[160px] lg:w-[178px] xl:w-[192px] h-auto object-contain pointer-events-none drop-shadow-[0_12px_20px_rgba(20,10,5,0.75)] select-none"
+                />
+
+                {/* Title Text */}
+                <motion.span
+                  animate={{
+                    y: hoveredIsland === 'story' ? -2 : 0,
+                    scale: hoveredIsland === 'story' ? 1.05 : 1.0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                  className="mt-1 font-display font-black text-xs sm:text-sm lg:text-base tracking-wider uppercase text-rose-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] group-hover:text-white transition-colors"
+                >
+                  The Story
+                </motion.span>
+              </motion.div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                "MORE ABOUT HIM" / "ABOUT ME" (Cyan Theme · Middle-Right of board)
+                Hardly stuck to board: zero floating animation
+                ══════════════════════════════════════════════════════════════════ */}
+            <div
+              ref={aboutIslandRef}
+              onClick={() => handleIslandClick('about')}
+              onMouseEnter={() => {
+                setHoveredIsland('about');
+                dreamAudio.playHover();
+              }}
+              onMouseLeave={() => setHoveredIsland(null)}
+              className="absolute right-[4%] top-[28%] z-20 cursor-pointer group flex flex-col items-center select-none"
+              title="More About Him · Click to Explore"
+            >
+              {/* Stationary firmly stuck container */}
+              <motion.div
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative flex flex-col items-center"
+              >
+                {/* Theme Color Glow (Cyan) */}
+                <div
+                  className={`absolute inset-[-8%] rounded-full bg-sky-400/22 blur-xl pointer-events-none transition-all duration-300 ${
+                    hoveredIsland === 'about' ? 'opacity-100 scale-105' : 'opacity-0 scale-95'
+                  }`}
+                />
+
+                {/* About Me Island Image firmly attached */}
+                <img
+                  src={islandAboutImg}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/islands/island_about.png';
+                  }}
+                  alt="More About Him Island"
+                  className="w-[96px] xs:w-[108px] sm:w-[122px] lg:w-[134px] xl:w-[146px] h-auto object-contain pointer-events-none drop-shadow-[0_10px_16px_rgba(20,10,5,0.7)] select-none"
+                />
+
+                {/* Title Text */}
+                <motion.span
+                  animate={{
+                    y: hoveredIsland === 'about' ? -2 : 0,
+                    scale: hoveredIsland === 'about' ? 1.05 : 1.0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                  className="mt-1 font-display font-black text-[10px] sm:text-[11px] lg:text-xs tracking-wider uppercase text-cyan-200 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] group-hover:text-white transition-colors"
+                >
+                  More About Him
+                </motion.span>
+              </motion.div>
+            </div>
+          </motion.div>
         </motion.div>
-      </main>
+      </div>
 
-      {/* ── 4. VISIBLE ANIMATED AIR WAVES SWEEPING ABOVE THE ISLAND OVERLAY (WITH INSTANT SOUND) ── */}
-      <PassingAirWavesAboveIslands />
-
-      {/* ── 5. REDIRECTING TRANSITIONS (Starting directly in the World Page) ────── */}
+      {/* ── 4. REDIRECTING TRANSITIONS (Starting directly in the World Page) ────── */}
       <StoryCloudCoverTransition
         isActive={activeTransition === 'story'}
         onComplete={() => handleTransitionComplete('/journey')}
@@ -658,361 +579,6 @@ export const WorldPage: React.FC = () => {
         isActive={activeTransition === 'works'}
         onComplete={() => handleTransitionComplete('/explore-works')}
       />
-
-    </div>
-  );
-};
-
-// ── ANIMATED AIR WAVES (Flowing Wind Currents & Breezes across the Sky) ───────
-const AnimatedAirWaves: React.FC = () => {
-  return (
-    <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-      {/* Stream 1: Upper Sky Sweeping Air Wave */}
-      <motion.div
-        className="absolute top-[16%] -left-[30%] w-[160%] h-32 opacity-45"
-        animate={{
-          x: ['-12%', '12%', '-12%'],
-          y: [-6, 6, -6],
-        }}
-        transition={{
-          duration: 14,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        <svg viewBox="0 0 1200 120" className="w-full h-full" fill="none">
-          <motion.path
-            d="M 0 60 Q 200 20, 400 60 T 800 60 T 1200 50"
-            stroke="url(#airWaveGrad1)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeDasharray="180 320"
-            animate={{ strokeDashoffset: [0, -1000] }}
-            transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
-          />
-          <motion.path
-            d="M 50 75 Q 250 40, 450 75 T 850 70 T 1200 65"
-            stroke="url(#airWaveGrad2)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeDasharray="120 280"
-            animate={{ strokeDashoffset: [0, -800] }}
-            transition={{ duration: 13, repeat: Infinity, ease: 'linear' }}
-          />
-          <defs>
-            <linearGradient id="airWaveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="25%" stopColor="#bae6fd" stopOpacity="0.8" />
-              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.9" />
-              <stop offset="75%" stopColor="#38bdf8" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="airWaveGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="30%" stopColor="#e0f2fe" stopOpacity="0.7" />
-              <stop offset="70%" stopColor="#7dd3fc" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </motion.div>
-
-      {/* Stream 2: Mid-Sky Gentle Flowing Air Gust */}
-      <motion.div
-        className="absolute top-[44%] -left-[20%] w-[140%] h-28 opacity-40"
-        animate={{
-          x: ['8%', '-8%', '8%'],
-          y: [5, -5, 5],
-        }}
-        transition={{
-          duration: 16,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        <svg viewBox="0 0 1000 100" className="w-full h-full" fill="none">
-          <motion.path
-            d="M 0 50 C 250 15, 350 85, 600 45 C 800 15, 900 70, 1000 50"
-            stroke="url(#airWaveGrad3)"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeDasharray="140 260"
-            animate={{ strokeDashoffset: [0, -850] }}
-            transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-          />
-          <defs>
-            <linearGradient id="airWaveGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="20%" stopColor="#ffffff" stopOpacity="0.7" />
-              <stop offset="60%" stopColor="#7dd3fc" stopOpacity="0.8" />
-              <stop offset="85%" stopColor="#38bdf8" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </motion.div>
-
-      {/* Stream 3: Lower Floating Breeze Ripple */}
-      <motion.div
-        className="absolute top-[72%] -left-[25%] w-[150%] h-32 opacity-35"
-        animate={{
-          x: ['-10%', '10%', '-10%'],
-          y: [-4, 6, -4],
-        }}
-        transition={{
-          duration: 18,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
-        <svg viewBox="0 0 1100 110" className="w-full h-full" fill="none">
-          <motion.path
-            d="M 0 55 Q 180 85, 380 50 T 780 55 T 1100 50"
-            stroke="url(#airWaveGrad4)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="160 300"
-            animate={{ strokeDashoffset: [0, -900] }}
-            transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-          />
-          <defs>
-            <linearGradient id="airWaveGrad4" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="30%" stopColor="#bae6fd" stopOpacity="0.6" />
-              <stop offset="70%" stopColor="#ffffff" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </motion.div>
-
-      {/* Floating Wind/Air Motes drifting across the sky */}
-      {[...Array(6)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-1.5 h-1.5 rounded-full bg-white/75 shadow-[0_0_8px_rgba(255,255,255,0.85)]"
-          style={{
-            top: `${14 + i * 13}%`,
-            left: '-10px',
-          }}
-          animate={{
-            x: ['0vw', '105vw'],
-            y: [0, (i % 2 === 0 ? -25 : 25), (i % 2 === 0 ? 15 : -15), 0],
-            opacity: [0, 0.85, 0.85, 0],
-          }}
-          transition={{
-            duration: 11 + i * 2.5,
-            repeat: Infinity,
-            ease: 'linear',
-            delay: i * 2,
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-// ── ANIMATED FLYING CRANE SVG COMPONENT (Flapping Wings) ────────────────────
-interface FlyingCraneProps {
-  scale?: number;
-  flipped?: boolean;
-  delay?: number;
-}
-
-const FlyingCrane: React.FC<FlyingCraneProps> = ({ scale = 1.0, flipped = false, delay = 0 }) => {
-  return (
-    <div
-      style={{
-        transform: `scale(${scale}) ${flipped ? 'scaleX(-1)' : ''}`,
-      }}
-      className="relative drop-shadow-[0_4px_8px_rgba(0,0,0,0.2)]"
-    >
-      <svg width="74" height="48" viewBox="0 0 100 65" fill="none">
-        <path
-          d="M 25 35 Q 50 30 75 35 Q 85 36 92 32 Q 78 40 45 42 Q 28 42 15 48 Q 20 40 25 35 Z"
-          fill="#ffffff"
-        />
-        <path
-          d="M 75 35 Q 88 28 92 18 Q 95 14 98 12 Q 95 18 90 28 Q 80 34 75 35 Z"
-          fill="#ffffff"
-        />
-        <circle cx="95" cy="13" r="2.5" fill="#ef4444" />
-        <path d="M 98 12 L 105 13 L 97 15 Z" fill="#f59e0b" />
-        <path d="M 15 48 Q 10 52 5 56 Q 14 47 22 43 Z" fill="#0f172a" />
-        <path d="M 30 42 L 5 58 M 32 42 L 8 62" stroke="#475569" strokeWidth="1.2" strokeLinecap="round" />
-
-        {/* Flapping Wing */}
-        <motion.g
-          animate={{
-            scaleY: [1, 0.4, -0.7, 0.4, 1],
-            y: [0, 4, 10, 4, 0],
-          }}
-          transition={{
-            duration: 1.1,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: delay,
-          }}
-          style={{ originX: '50px', originY: '32px' }}
-        >
-          <path
-            d="M 45 32 Q 55 12 70 2 Q 58 10 50 18 Q 42 12 30 18 Q 38 24 45 32 Z"
-            fill="#ffffff"
-            stroke="#e2e8f0"
-            strokeWidth="0.8"
-          />
-          <path d="M 68 3 Q 74 0 78 2 Q 70 8 62 14 Z" fill="#0f172a" />
-        </motion.g>
-      </svg>
-    </div>
-  );
-};
-
-// ── VISIBLE ANIMATED AIR WAVES (Sweeping dynamically Left-to-Right or Right-to-Left above Islands) ──
-interface AirWaveEvent {
-  id: number;
-  direction: 'left-to-right' | 'right-to-left';
-  top: number;
-  scale: number;
-  duration: number;
-}
-
-const PassingAirWavesAboveIslands: React.FC = () => {
-  const [waves, setWaves] = useState<AirWaveEvent[]>([]);
-
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-
-    const scheduleNextWave = (delayMs: number) => {
-      timeoutId = setTimeout(() => {
-        const direction: 'left-to-right' | 'right-to-left' = Math.random() > 0.5 ? 'left-to-right' : 'right-to-left';
-        // Random vertical position across the upper/middle island span
-        const top = 18 + Math.random() * 52;
-        const scale = 0.88 + Math.random() * 0.42;
-        const duration = 2.6 + Math.random() * 0.6;
-        const id = Date.now() + Math.random();
-
-        // Play the sweeping air wave gust whoosh sound immediately!
-        dreamAudio.playAirWaveWhoosh(direction);
-
-        setWaves((prev) => [...prev.slice(-2), { id, direction, top, scale, duration }]);
-
-        // Auto remove when offscreen
-        setTimeout(() => {
-          setWaves((prev) => prev.filter((w) => w.id !== id));
-        }, (duration + 0.3) * 1000);
-
-        // Schedule next air wave in 7 to 12 seconds
-        const nextDelay = 7000 + Math.random() * 5500;
-        scheduleNextWave(nextDelay);
-      }, delayMs);
-    };
-
-    // First air wave arrives in 1.8 seconds so user experiences it right away
-    scheduleNextWave(1800);
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-  return (
-    <div className="fixed inset-0 pointer-events-none z-35 overflow-hidden">
-      {waves.map((wave) => (
-        <motion.div
-          key={wave.id}
-          initial={{
-            x: wave.direction === 'left-to-right' ? '-45vw' : '135vw',
-            opacity: 0,
-          }}
-          animate={{
-            x: wave.direction === 'left-to-right' ? '135vw' : '-45vw',
-            opacity: [0, 0.95, 0.95, 0],
-          }}
-          transition={{
-            duration: wave.duration,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          style={{
-            position: 'absolute',
-            top: `${wave.top}%`,
-            width: '440px',
-            maxWidth: '92vw',
-            transform: `scale(${wave.scale}) ${wave.direction === 'right-to-left' ? 'scaleX(-1)' : ''}`,
-            filter: 'drop-shadow(0 0 16px rgba(56, 189, 248, 0.75))',
-          }}
-          className="flex flex-col select-none"
-        >
-          {/* Luminous dynamic breeze streamlines & eddy spirals */}
-          <svg viewBox="0 0 440 90" className="w-full h-auto overflow-visible" fill="none">
-            <defs>
-              <linearGradient id={`waveGrad-${wave.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-                <stop offset="20%" stopColor="#e0f2fe" stopOpacity="0.85" />
-                <stop offset="55%" stopColor="#ffffff" stopOpacity="1" />
-                <stop offset="85%" stopColor="#38bdf8" stopOpacity="0.75" />
-                <stop offset="100%" stopColor="#bae6fd" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id={`waveCore-${wave.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-                <stop offset="40%" stopColor="#ffffff" stopOpacity="0.95" />
-                <stop offset="80%" stopColor="#7dd3fc" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            {/* Main leading wind filament */}
-            <path
-              d="M 10 45 Q 120 15, 240 45 T 430 35"
-              stroke={`url(#waveCore-${wave.id})`}
-              strokeWidth="3.5"
-              strokeLinecap="round"
-            />
-
-            {/* Upper trailing breeze ribbon with gentle curve */}
-            <path
-              d="M 50 25 Q 160 5, 280 30 T 410 20 Q 430 18, 435 25 Q 430 32, 415 30"
-              stroke={`url(#waveGrad-${wave.id})`}
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeDasharray="18 10 120 15"
-            />
-
-            {/* Lower secondary sweeping wind stream */}
-            <path
-              d="M 30 65 Q 150 82, 270 55 T 425 60"
-              stroke={`url(#waveGrad-${wave.id})`}
-              strokeWidth="2.0"
-              strokeLinecap="round"
-              strokeDasharray="60 14 80 12"
-            />
-
-            {/* Small breeze swirl eddies */}
-            <path
-              d="M 280 40 C 310 40, 325 55, 315 65 C 305 75, 285 65, 290 50 C 295 40, 310 45, 305 55"
-              stroke="rgba(255, 255, 255, 0.85)"
-              strokeWidth="1.6"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
-
-          {/* Drifting wind motes & sparkles */}
-          <div className="absolute inset-0 pointer-events-none">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute rounded-full bg-white shadow-[0_0_8px_#38bdf8]"
-                style={{
-                  width: `${2.5 + (i % 3)}px`,
-                  height: `${2.5 + (i % 3)}px`,
-                  left: `${20 + i * 14}%`,
-                  top: `${30 + (i % 3) * 15}%`,
-                  opacity: 0.9,
-                }}
-              />
-            ))}
-          </div>
-        </motion.div>
-      ))}
     </div>
   );
 };

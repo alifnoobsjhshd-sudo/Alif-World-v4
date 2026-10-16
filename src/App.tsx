@@ -38,6 +38,8 @@ import { dreamAudio } from './utils/audio';
 import { CustomCursor } from './components/CustomCursor';
 import { VirtualCursorPad } from './components/VirtualCursorPad';
 import { GlobalChatButton } from './components/GlobalChatButton';
+import { AutoLandscapeWrapper } from './components/AutoLandscapeWrapper';
+import { MobileLandscapeNotice } from './components/MobileLandscapeNotice';
 
 const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
 
@@ -45,6 +47,8 @@ const MAX_DEPTH = (STORY_SCENES.length - 1) * SCENE_STEP; // 15 * 3800 = 57,000
 
 function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromLetsDrive = Boolean(location.state?.fromLetsDrive);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isRocketLaunching, setIsRocketLaunching] = useState(false);
 
@@ -159,44 +163,80 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
 
   // ── Wheel scroll — buttery smooth, bounded, no jumping ─────────────────────
   useEffect(() => {
+    let hasRedirected = false;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       stopArrowNav();
+
+      const current = depthValue.get();
+      if (fromLetsDrive && current >= MAX_DEPTH - 100 && e.deltaY > 20 && !hasRedirected) {
+        hasRedirected = true;
+        dreamAudio.playPop();
+        dreamAudio.stopJourneyMusic(0.8);
+        navigate('/world');
+        return;
+      }
+
       const delta = Math.max(-100, Math.min(100, e.deltaY));
-      const next = Math.max(0, Math.min(MAX_DEPTH, depthValue.get() + delta * 9.5));
+      const next = Math.max(0, Math.min(MAX_DEPTH, current + delta * 9.5));
       depthValue.set(next);
     };
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, [depthValue]);
+  }, [depthValue, fromLetsDrive, navigate]);
 
   // ── Touch scroll — responsive & natural inertia ───────────────────────────
   const touchStartY = useRef(0);
   const touchLastY  = useRef(0);
-  const touchVelY   = useRef(0);
+  const touchStartX = useRef(0);
+  const touchLastX  = useRef(0);
+  const touchVel    = useRef(0);
   const rafId       = useRef<number | null>(null);
 
   useEffect(() => {
+    let hasRedirected = false;
     const onTouchStart = (e: TouchEvent) => {
       stopArrowNav();
       touchStartY.current = e.touches[0].clientY;
       touchLastY.current  = e.touches[0].clientY;
-      touchVelY.current   = 0;
+      touchStartX.current = e.touches[0].clientX;
+      touchLastX.current  = e.touches[0].clientX;
+      touchVel.current    = 0;
       if (rafId.current) cancelAnimationFrame(rafId.current);
     };
 
     const onTouchMove = (e: TouchEvent) => {
       stopArrowNav();
-      const y     = e.touches[0].clientY;
-      const delta = touchLastY.current - y;
-      touchVelY.current  = delta;
+      const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
+      const isPortraitRotated = window.innerHeight > window.innerWidth && Math.min(window.innerWidth, window.innerHeight) <= 840;
+
+      // In rotated landscape view, swiping horizontally (physical X) or vertically (physical Y) both provide natural navigation
+      const deltaY = touchLastY.current - y;
+      const deltaX = touchLastX.current - x;
+      const delta = isPortraitRotated
+        ? (Math.abs(deltaX) > Math.abs(deltaY) ? -deltaX : deltaY)
+        : deltaY;
+
+      touchVel.current   = delta;
       touchLastY.current = y;
-      const next = Math.max(0, Math.min(MAX_DEPTH, depthValue.get() + delta * 9.0));
+      touchLastX.current = x;
+
+      const current = depthValue.get();
+      if (fromLetsDrive && current >= MAX_DEPTH - 150 && delta > 15 && !hasRedirected) {
+        hasRedirected = true;
+        dreamAudio.playPop();
+        dreamAudio.stopJourneyMusic(0.8);
+        navigate('/world');
+        return;
+      }
+
+      const next = Math.max(0, Math.min(MAX_DEPTH, current + delta * 9.0));
       depthValue.set(next);
     };
 
     const onTouchEnd = () => {
-      let vel = touchVelY.current;
+      let vel = touchVel.current;
       const step = () => {
         if (Math.abs(vel) < 0.2) return;
         const next = Math.max(0, Math.min(MAX_DEPTH, depthValue.get() + vel * 7.5));
@@ -216,7 +256,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       window.removeEventListener('touchend',   onTouchEnd);
       if (rafId.current) cancelAnimationFrame(rafId.current);
     };
-  }, [depthValue]);
+  }, [depthValue, fromLetsDrive, navigate]);
 
   // ── Arrow key navigation (Up/Down) with constant velocity ─────────────────
   useEffect(() => {
@@ -290,7 +330,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   }, [depthValue, isContactOpen, isRocketLaunching]);
 
   return (
-    <div className="relative bg-[#f8f8f8] text-gray-800 font-sans selection:bg-blue-100 h-screen h-[100dvh] w-screen overflow-hidden touch-none overscroll-none">
+    <div className="relative bg-[#f8f8f8] text-gray-800 font-sans selection:bg-blue-100 w-full h-full overflow-hidden touch-none overscroll-none">
       <SEO 
         title="Alif-World | Alif Portfolio Story Journey (Zenox Portfolio)"
         description="Experience the cinematic sky storyline of Alif (Zenox). Discover the creative milestones, development passion, and interactive frontend works of Alif-World."
@@ -326,7 +366,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       </motion.div>
 
       {/* ── Top Story Navigator with Paper Airplane ─────────────────────────── */}
-      <SectionPlane activeSection={activeSection} depthValue={depthValue} />
+      <SectionPlane activeSection={activeSection} depthValue={depthValue} fromLetsDrive={fromLetsDrive} />
 
       {/* ── Dynamic Sky Atmosphere Background ───────────────────────────────── */}
       <motion.div
@@ -365,6 +405,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
             >
               <StorySceneView
                 scene={scene}
+                fromLetsDrive={fromLetsDrive}
                 onOpenContact={() => {
                   dreamAudio.playChime();
                   setIsContactOpen(true);
@@ -416,15 +457,20 @@ export default function App() {
 
   return (
     <>
-      <CustomCursor />
-      <VirtualCursorPad />
-      <GlobalChatButton />
-      <AnimatePresence>
-        {initialLoading && pathname !== '/chat' && (
-          <LoadingScreen onComplete={() => setInitialLoading(false)} />
-        )}
-      </AnimatePresence>
-      <Routes>
+      {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
+      <MobileLandscapeNotice />
+
+      {/* ── AUTOMATIC LANDSCAPE CONTAINER (All pages rendered in desktop landscape ratio) ── */}
+      <AutoLandscapeWrapper>
+        <CustomCursor />
+        <VirtualCursorPad />
+        <GlobalChatButton />
+        <AnimatePresence>
+          {initialLoading && pathname !== '/chat' && (
+            <LoadingScreen onComplete={() => setInitialLoading(false)} />
+          )}
+        </AnimatePresence>
+        <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/world" element={<WorldPage />} />
         <Route path="/journey" element={<StorylinePortfolio initialLoading={initialLoading} />} />
@@ -455,6 +501,7 @@ export default function App() {
           )}
         />
       </Routes>
+    </AutoLandscapeWrapper>
     </>
   );
 }
