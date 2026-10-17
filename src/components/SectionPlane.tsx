@@ -148,7 +148,7 @@ export const SectionPlane = React.memo(({ activeSection, depthValue, fromLetsDri
       {/* ── VERTICAL FLIGHT PATH PROGRESS BAR (Docked on Right Side - Compact & Sleek) ── */}
       <nav
         aria-label="Vertical Storyline Progress"
-        className="fixed right-2 sm:right-4 top-1/2 -translate-y-1/2 z-40 pointer-events-auto flex flex-col items-center justify-between bg-white/85 hover:bg-white/95 backdrop-blur-xl py-1.5 px-1 rounded-full border border-white/80 shadow-[0_8px_25px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] h-[38vh] min-h-[175px] max-h-[235px] transition-all"
+        className="fixed right-2 sm:right-4 top-[calc(50%+3rem)] -translate-y-1/2 z-40 pointer-events-auto flex flex-col items-center justify-between bg-white/85 hover:bg-white/95 backdrop-blur-xl py-1.5 px-1 rounded-full border border-white/80 shadow-[0_8px_25px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.9)] h-[38vh] min-h-[175px] max-h-[235px] transition-all"
       >
         {/* Previous Scene Button (Scroll Up) */}
         <button

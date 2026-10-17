@@ -133,8 +133,31 @@ export const LandingPage: React.FC = () => {
     }
     if (isZooming) return;
 
+    const stage =
+      containerRef.current?.closest<HTMLElement>('#auto-landscape-container') ??
+      containerRef.current;
+    const bounds = stage?.getBoundingClientRect();
+    const isAutoRotated = Boolean(stage?.style.transform.includes('rotate(90deg)'));
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (stage && bounds && bounds.width > 0 && bounds.height > 0) {
+      const stageWidth = stage.clientWidth || bounds.width;
+      const stageHeight = stage.clientHeight || bounds.height;
+      if (isAutoRotated) {
+        // The app's 90° mobile rotation maps the physical screen's Y axis to stage X.
+        x = ((e.clientY - bounds.top) / bounds.height) * stageWidth;
+        y = ((bounds.right - e.clientX) / bounds.width) * stageHeight;
+      } else {
+        x = ((e.clientX - bounds.left) / bounds.width) * stageWidth;
+        y = ((e.clientY - bounds.top) / bounds.height) * stageHeight;
+      }
+      x = Math.max(0, Math.min(stageWidth, x));
+      y = Math.max(0, Math.min(stageHeight, y));
+    }
+
     const id = Date.now() + Math.random();
-    setRipples((prev) => [...prev.slice(-4), { id, x: e.clientX, y: e.clientY }]);
+    setRipples((prev) => [...prev.slice(-4), { id, x, y }]);
     dreamAudio.playDreamRipple();
 
     setTimeout(() => {
@@ -334,24 +357,6 @@ export const LandingPage: React.FC = () => {
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white absolute top-1 left-1.5 sm:top-1.5 sm:left-2 opacity-95" />
             </motion.div>
 
-            {/* Bubble 4 (Connecting bubble right under dream cloud) */}
-            <motion.div
-              className="absolute left-[26.8%] top-[24.0%] w-5 h-5 sm:w-7 sm:h-7 lg:w-9 lg:h-9 rounded-full bg-white/90 border border-sky-200 sm:border-2 shadow-[0_0_18px_rgba(56,189,248,0.75)] pointer-events-none z-25"
-              style={{ willChange: 'transform, opacity', transform: 'translateZ(65px)' }}
-              animate={
-                isZooming
-                  ? { scale: [1, 2.1, 3.8], opacity: [0.9, 1, 0.2] }
-                  : { y: [-4, 4, -4], scale: [0.98, 1.06, 0.98], x: [-1, 1, -1] }
-              }
-              transition={
-                isZooming
-                  ? { duration: 4.5, delay: 0.5, ease: 'easeOut' }
-                  : { duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }
-              }
-            >
-              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-white absolute top-1 left-1.5 sm:top-1.5 sm:left-2.5 opacity-95" />
-            </motion.div>
-
             {/* ── MAIN VIBRANT DREAM BUBBLE (Desktop placement above character) ── */}
             <motion.div 
               style={{ 
@@ -469,7 +474,7 @@ export const LandingPage: React.FC = () => {
       {ripples.map((rip) => (
         <div
           key={rip.id}
-          className="fixed pointer-events-none z-35 -translate-x-1/2 -translate-y-1/2"
+          className="absolute pointer-events-none z-35 -translate-x-1/2 -translate-y-1/2"
           style={{ left: rip.x, top: rip.y }}
         >
           {/* Central quick soft flash glint */}

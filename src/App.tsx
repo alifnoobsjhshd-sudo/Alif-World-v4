@@ -45,6 +45,15 @@ const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
 
 const MAX_DEPTH = (STORY_SCENES.length - 1) * SCENE_STEP; // 15 * 3800 = 57,000
 
+const isCompactTouchViewport = () => {
+  if (typeof window === 'undefined') return false;
+  const isTouchFirst = window.matchMedia('(pointer: coarse)').matches &&
+    window.matchMedia('(hover: none)').matches;
+  const isCompact = Math.min(window.innerWidth, window.innerHeight) <= 840;
+  const isPhoneLikeViewport = window.innerWidth <= 1024 || window.innerHeight <= 520;
+  return isTouchFirst && isCompact && isPhoneLikeViewport;
+};
+
 function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -165,11 +174,16 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   useEffect(() => {
     let hasRedirected = false;
     const handleWheel = (e: WheelEvent) => {
+      if (isContactOpen || isRocketLaunching) return;
       e.preventDefault();
       stopArrowNav();
 
+      const isMobileViewport = isCompactTouchViewport();
+      const wheelDelta = isMobileViewport ? e.deltaX : e.deltaY;
+      if (wheelDelta === 0) return;
+
       const current = depthValue.get();
-      if (fromLetsDrive && current >= MAX_DEPTH - 100 && e.deltaY > 20 && !hasRedirected) {
+      if (fromLetsDrive && current >= MAX_DEPTH - 100 && wheelDelta > 20 && !hasRedirected) {
         hasRedirected = true;
         dreamAudio.playPop();
         dreamAudio.stopJourneyMusic(0.8);
@@ -177,50 +191,63 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
         return;
       }
 
-      const delta = Math.max(-100, Math.min(100, e.deltaY));
+      const delta = Math.max(-100, Math.min(100, wheelDelta));
       const next = Math.max(0, Math.min(MAX_DEPTH, current + delta * 9.5));
       depthValue.set(next);
     };
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, [depthValue, fromLetsDrive, navigate]);
+  }, [depthValue, fromLetsDrive, isContactOpen, isRocketLaunching, navigate]);
 
   // ── Touch scroll — responsive & natural inertia ───────────────────────────
-  const touchStartY = useRef(0);
   const touchLastY  = useRef(0);
-  const touchStartX = useRef(0);
   const touchLastX  = useRef(0);
   const touchVel    = useRef(0);
+  const touchStartedOnControl = useRef(false);
   const rafId       = useRef<number | null>(null);
 
   useEffect(() => {
     let hasRedirected = false;
     const onTouchStart = (e: TouchEvent) => {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      touchStartedOnControl.current =
+        isContactOpen ||
+        isRocketLaunching ||
+        Boolean(target?.closest('button, a, input, textarea, select, [role="dialog"], [contenteditable="true"]'));
+      if (touchStartedOnControl.current) {
+        touchVel.current = 0;
+        return;
+      }
+
+      const touch = e.touches[0];
+      if (!touch) return;
       stopArrowNav();
-      touchStartY.current = e.touches[0].clientY;
-      touchLastY.current  = e.touches[0].clientY;
-      touchStartX.current = e.touches[0].clientX;
-      touchLastX.current  = e.touches[0].clientX;
-      touchVel.current    = 0;
-      if (rafId.current) cancelAnimationFrame(rafId.current);
+      touchLastY.current = touch.clientY;
+      touchLastX.current = touch.clientX;
+      touchVel.current = 0;
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      stopArrowNav();
-      const x = e.touches[0].clientX;
-      const y = e.touches[0].clientY;
-      const isPortraitRotated = window.innerHeight > window.innerWidth && Math.min(window.innerWidth, window.innerHeight) <= 840;
+      if (touchStartedOnControl.current || isContactOpen || isRocketLaunching) return;
+      const touch = e.touches[0];
+      if (!touch) return;
 
-      // In rotated landscape view, swiping horizontally (physical X) or vertically (physical Y) both provide natural navigation
+      stopArrowNav();
+      const x = touch.clientX;
+      const y = touch.clientY;
+      const isMobileViewport = isCompactTouchViewport();
       const deltaY = touchLastY.current - y;
       const deltaX = touchLastX.current - x;
-      const delta = isPortraitRotated
-        ? (Math.abs(deltaX) > Math.abs(deltaY) ? -deltaX : deltaY)
-        : deltaY;
+      const delta = isMobileViewport ? deltaX : deltaY;
 
       touchVel.current   = delta;
       touchLastY.current = y;
       touchLastX.current = x;
+      if (isMobileViewport && e.cancelable) e.preventDefault();
 
       const current = depthValue.get();
       if (fromLetsDrive && current >= MAX_DEPTH - 150 && delta > 15 && !hasRedirected) {
@@ -236,10 +263,24 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
     };
 
     const onTouchEnd = () => {
+      if (touchStartedOnControl.current || isContactOpen || isRocketLaunching) {
+        touchStartedOnControl.current = false;
+        touchVel.current = 0;
+        return;
+      }
+
       let vel = touchVel.current;
       const step = () => {
-        if (Math.abs(vel) < 0.2) return;
-        const next = Math.max(0, Math.min(MAX_DEPTH, depthValue.get() + vel * 7.5));
+        if (Math.abs(vel) < 0.2) {
+          rafId.current = null;
+          return;
+        }
+        const current = depthValue.get();
+        const next = Math.max(0, Math.min(MAX_DEPTH, current + vel * 7.5));
+        if (next === current) {
+          rafId.current = null;
+          return;
+        }
         depthValue.set(next);
         vel *= 0.90;
         rafId.current = requestAnimationFrame(step);
@@ -247,16 +288,27 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       rafId.current = requestAnimationFrame(step);
     };
 
+    const onTouchCancel = () => {
+      touchStartedOnControl.current = false;
+      touchVel.current = 0;
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+    };
+
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove',  onTouchMove,  { passive: false });
     window.addEventListener('touchend',   onTouchEnd,   { passive: true });
+    window.addEventListener('touchcancel', onTouchCancel, { passive: true });
     return () => {
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchmove',  onTouchMove);
       window.removeEventListener('touchend',   onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchCancel);
       if (rafId.current) cancelAnimationFrame(rafId.current);
     };
-  }, [depthValue, fromLetsDrive, navigate]);
+  }, [depthValue, fromLetsDrive, isContactOpen, isRocketLaunching, navigate]);
 
   // ── Arrow key navigation (Up/Down) with constant velocity ─────────────────
   useEffect(() => {
@@ -264,12 +316,20 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       // Don't intercept if user is typing in forms or if modal/transition is active
       if (isContactOpen || isRocketLaunching) return;
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      if (
+        target &&
+        (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.closest('button, a, [role="button"]')
+        )
+      ) {
         return;
       }
 
-      const isDown = e.key === 'ArrowDown' || e.key === 'PageDown';
-      const isUp = e.key === 'ArrowUp' || e.key === 'PageUp';
+      const isDown = e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown';
+      const isUp = e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp';
 
       if (!isDown && !isUp) return;
 
