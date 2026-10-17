@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { dreamAudio } from '../utils/audio';
+import { isTouchFirstViewport } from '../utils/inputMode';
 import { MagneticShimmerButton } from './MagneticShimmerButton';
 
 interface MarineDepthHUDProps {
@@ -14,6 +15,18 @@ export const MarineDepthHUD: React.FC<MarineDepthHUDProps> = ({
   isMuted,
   onToggleAudio,
 }) => {
+  const [isTouchViewport, setIsTouchViewport] = useState(isTouchFirstViewport);
+
+  useEffect(() => {
+    const updateViewportHint = () => setIsTouchViewport(isTouchFirstViewport());
+    window.addEventListener('resize', updateViewportHint, { passive: true });
+    window.addEventListener('orientationchange', updateViewportHint, { passive: true });
+    return () => {
+      window.removeEventListener('resize', updateViewportHint);
+      window.removeEventListener('orientationchange', updateViewportHint);
+    };
+  }, []);
+
   return (
     <>
       {/* ── TOP HEADER (BACK TO WORLDS & SOUND TOGGLE WITH MAGNETIC SHIMMER) ── */}
@@ -74,7 +87,9 @@ export const MarineDepthHUD: React.FC<MarineDepthHUDProps> = ({
               Ocean Navigator
             </span>
             <span className="text-[10px] text-cyan-100/70 font-sans">
-              Scroll or drag to swim through depths
+              {isTouchViewport
+                ? 'Swipe ← back · → forward'
+                : 'Scroll or drag to swim through depths'}
             </span>
           </div>
         </div>

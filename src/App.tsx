@@ -40,19 +40,11 @@ import { VirtualCursorPad } from './components/VirtualCursorPad';
 import { GlobalChatButton } from './components/GlobalChatButton';
 import { AutoLandscapeWrapper } from './components/AutoLandscapeWrapper';
 import { MobileLandscapeNotice } from './components/MobileLandscapeNotice';
+import { isTouchFirstViewport } from './utils/inputMode';
 
 const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
 
 const MAX_DEPTH = (STORY_SCENES.length - 1) * SCENE_STEP; // 15 * 3800 = 57,000
-
-const isCompactTouchViewport = () => {
-  if (typeof window === 'undefined') return false;
-  const isTouchFirst = window.matchMedia('(pointer: coarse)').matches &&
-    window.matchMedia('(hover: none)').matches;
-  const isCompact = Math.min(window.innerWidth, window.innerHeight) <= 840;
-  const isPhoneLikeViewport = window.innerWidth <= 1024 || window.innerHeight <= 520;
-  return isTouchFirst && isCompact && isPhoneLikeViewport;
-};
 
 function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   const navigate = useNavigate();
@@ -178,8 +170,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       e.preventDefault();
       stopArrowNav();
 
-      const isMobileViewport = isCompactTouchViewport();
-      const wheelDelta = isMobileViewport ? e.deltaX : e.deltaY;
+      const wheelDelta = isTouchFirstViewport() ? e.deltaX : e.deltaY;
       if (wheelDelta === 0) return;
 
       const current = depthValue.get();
@@ -200,20 +191,24 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   }, [depthValue, fromLetsDrive, isContactOpen, isRocketLaunching, navigate]);
 
   // ── Touch scroll — responsive & natural inertia ───────────────────────────
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
   const touchLastY  = useRef(0);
   const touchLastX  = useRef(0);
   const touchVel    = useRef(0);
+  const touchAxis   = useRef<'horizontal' | 'vertical' | null>(null);
   const touchStartedOnControl = useRef(false);
   const rafId       = useRef<number | null>(null);
 
   useEffect(() => {
     let hasRedirected = false;
     const onTouchStart = (e: TouchEvent) => {
-      const target = e.target instanceof HTMLElement ? e.target : null;
+      const target = e.target instanceof Element ? e.target : null;
       touchStartedOnControl.current =
         isContactOpen ||
         isRocketLaunching ||
         Boolean(target?.closest('button, a, input, textarea, select, [role="dialog"], [contenteditable="true"]'));
+      touchAxis.current = null;
       if (touchStartedOnControl.current) {
         touchVel.current = 0;
         return;
@@ -222,6 +217,8 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       const touch = e.touches[0];
       if (!touch) return;
       stopArrowNav();
+      touchStartY.current = touch.clientY;
+      touchStartX.current = touch.clientX;
       touchLastY.current = touch.clientY;
       touchLastX.current = touch.clientX;
       touchVel.current = 0;
@@ -239,15 +236,29 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       stopArrowNav();
       const x = touch.clientX;
       const y = touch.clientY;
-      const isMobileViewport = isCompactTouchViewport();
       const deltaY = touchLastY.current - y;
-      const deltaX = touchLastX.current - x;
-      const delta = isMobileViewport ? deltaX : deltaY;
+      const deltaX = x - touchLastX.current;
+      const isTouchViewport = isTouchFirstViewport();
 
-      touchVel.current   = delta;
+      if (isTouchViewport && touchAxis.current === null) {
+        const totalX = x - touchStartX.current;
+        const totalY = y - touchStartY.current;
+        if (Math.max(Math.abs(totalX), Math.abs(totalY)) >= 8) {
+          touchAxis.current =
+            Math.abs(totalX) >= Math.abs(totalY) ? 'horizontal' : 'vertical';
+        }
+      }
+
       touchLastY.current = y;
       touchLastX.current = x;
-      if (isMobileViewport && e.cancelable) e.preventDefault();
+      if (isTouchViewport && e.cancelable) e.preventDefault();
+      if (isTouchViewport && touchAxis.current !== 'horizontal') {
+        touchVel.current = 0;
+        return;
+      }
+
+      const delta = isTouchViewport ? deltaX : deltaY;
+      touchVel.current = delta;
 
       const current = depthValue.get();
       if (fromLetsDrive && current >= MAX_DEPTH - 150 && delta > 15 && !hasRedirected) {
@@ -266,10 +277,12 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
       if (touchStartedOnControl.current || isContactOpen || isRocketLaunching) {
         touchStartedOnControl.current = false;
         touchVel.current = 0;
+        touchAxis.current = null;
         return;
       }
 
       let vel = touchVel.current;
+      touchAxis.current = null;
       const step = () => {
         if (Math.abs(vel) < 0.2) {
           rafId.current = null;
@@ -291,6 +304,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
     const onTouchCancel = () => {
       touchStartedOnControl.current = false;
       touchVel.current = 0;
+      touchAxis.current = null;
       if (rafId.current) {
         cancelAnimationFrame(rafId.current);
         rafId.current = null;

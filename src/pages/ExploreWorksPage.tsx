@@ -21,6 +21,7 @@ import { Section } from '../components/Section';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { isTouchFirstViewport } from '../utils/inputMode';
 
 const MAX_SPACE_DEPTH = 36000;
 const KENO_STORE_DEPTH = 4500;
@@ -64,9 +65,13 @@ export const ExploreWorksPage: React.FC = () => {
   });
   const scrollVelocity = useVelocity(smoothedDepth);
 
-  // Touch scroll references (track both X and Y for straightness detection)
+  // Touch navigation references
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const touchLastX = useRef<number | null>(null);
+  const touchLastY = useRef<number | null>(null);
+  const touchAxis = useRef<'horizontal' | 'vertical' | null>(null);
+  const touchStartedOnControl = useRef(false);
 
   // ── Automatic Cosmic Theme Audio (Plays automatically regardless of scroll) ──
   useEffect(() => {
@@ -140,6 +145,7 @@ export const ExploreWorksPage: React.FC = () => {
     };
 
     const cancelSpeedBoost = () => {
+      setSpeedDirection('backward');
       if (speedDeactivateTimeout.current) clearTimeout(speedDeactivateTimeout.current);
       isSpeedEffectActiveRef.current = false;
       setIsSpeedEffectActive(false);
@@ -148,24 +154,25 @@ export const ExploreWorksPage: React.FC = () => {
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const deltaY = e.deltaY;
+      const scrollDelta = isTouchFirstViewport() ? e.deltaX : e.deltaY;
+      if (scrollDelta === 0) return;
 
       // Straight forward scroll (even a short flick, without needing to hold)
-      if (deltaY > 6) {
+      if (scrollDelta > 6) {
         activateSpeedBoost();
-      } else if (deltaY < -6) {
+      } else if (scrollDelta < -6) {
         cancelSpeedBoost();
       }
 
       // Fast forward scroll when boosting, and increased backwards movement scrolling fast (not too much)
       let multiplier = 7.0;
-      if (deltaY > 0) {
+      if (scrollDelta > 0) {
         multiplier = isSpeedEffectActiveRef.current ? 15.0 : 7.0;
-      } else if (deltaY < 0) {
+      } else if (scrollDelta < 0) {
         multiplier = 10.5; // Increased backward speed ("not to much")
       }
 
-      const delta = Math.max(-100, Math.min(100, deltaY));
+      const delta = Math.max(-100, Math.min(100, scrollDelta));
       const current = depthValue.get();
       const next = Math.max(0, Math.min(MAX_SPACE_DEPTH, current + delta * multiplier));
       depthValue.set(next);
@@ -210,49 +217,88 @@ export const ExploreWorksPage: React.FC = () => {
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        touchStartX.current = e.touches[0].clientX;
-        touchStartY.current = e.touches[0].clientY;
-      }
+      const target = e.target instanceof Element ? e.target : null;
+      touchStartedOnControl.current = Boolean(
+        target?.closest('button, a, input, textarea, select, [role="button"], [role="dialog"], [contenteditable="true"]'),
+      );
+      touchAxis.current = null;
+      if (touchStartedOnControl.current) return;
+
+      const touch = e.touches[0];
+      if (!touch) return;
+      touchStartX.current = touch.clientX;
+      touchStartY.current = touch.clientY;
+      touchLastX.current = touch.clientX;
+      touchLastY.current = touch.clientY;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY.current === null || touchStartX.current === null) return;
-      const currentY = e.touches[0].clientY;
-      const currentX = e.touches[0].clientX;
-      const touchDeltaY = touchStartY.current - currentY;
-      const touchDeltaX = Math.abs(currentX - touchStartX.current);
-      touchStartY.current = currentY;
+      if (
+        touchStartedOnControl.current ||
+        touchStartY.current === null ||
+        touchStartX.current === null ||
+        touchLastX.current === null ||
+        touchLastY.current === null
+      ) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const currentY = touch.clientY;
+      const currentX = touch.clientX;
+      const deltaX = currentX - touchLastX.current;
+      const deltaY = touchLastY.current - currentY;
+      const isTouchViewport = isTouchFirstViewport();
+
+      if (isTouchViewport && touchAxis.current === null) {
+        const totalX = currentX - touchStartX.current;
+        const totalY = currentY - touchStartY.current;
+        if (Math.max(Math.abs(totalX), Math.abs(totalY)) >= 8) {
+          touchAxis.current =
+            Math.abs(totalX) >= Math.abs(totalY) ? 'horizontal' : 'vertical';
+        }
+      }
+
+      touchLastX.current = currentX;
+      touchLastY.current = currentY;
+      if (isTouchViewport && e.cancelable) e.preventDefault();
+      if (isTouchViewport && touchAxis.current !== 'horizontal') return;
+
+      const delta = isTouchViewport ? deltaX : deltaY;
+      if (delta === 0) return;
 
       // Straight forward scroll (even a short flick, without holding)
-      // Checks that vertical movement is straight and not a simple tap
-      if (touchDeltaY > 6 && touchDeltaY >= touchDeltaX * 0.45) {
+      if (delta > 6) {
         activateSpeedBoost();
-      } else if (touchDeltaY < -6) {
+      } else if (delta < -6) {
         cancelSpeedBoost();
       }
 
       let multiplier = 5.5;
-      if (touchDeltaY > 0) {
+      if (delta > 0) {
         multiplier = isSpeedEffectActiveRef.current ? 12.0 : 5.5;
-      } else if (touchDeltaY < 0) {
+      } else if (delta < 0) {
         multiplier = 9.0; // Increased backward speed on touch
       }
 
       const current = depthValue.get();
-      depthValue.set(Math.max(0, Math.min(MAX_SPACE_DEPTH, current + touchDeltaY * multiplier)));
+      depthValue.set(Math.max(0, Math.min(MAX_SPACE_DEPTH, current + delta * multiplier)));
     };
 
     const handleTouchEnd = () => {
+      touchStartedOnControl.current = false;
+      touchAxis.current = null;
       touchStartX.current = null;
       touchStartY.current = null;
+      touchLastX.current = null;
+      touchLastY.current = null;
     };
 
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
     return () => {
       if (speedDeactivateTimeout.current) clearTimeout(speedDeactivateTimeout.current);
@@ -263,6 +309,7 @@ export const ExploreWorksPage: React.FC = () => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [depthValue]);
 

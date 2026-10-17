@@ -341,7 +341,7 @@ export const LandingPage: React.FC = () => {
 
             {/* Bubble 3 (Medium bubble mid-way between head and cloud) */}
             <motion.div
-              className="absolute left-[31.0%] top-[29.5%] w-4 h-4 sm:w-5 sm:h-5 lg:w-7 lg:h-7 rounded-full bg-white/90 border border-sky-200 sm:border-2 shadow-[0_0_16px_rgba(56,189,248,0.7)] pointer-events-none z-25"
+              className="hidden lg:block absolute left-[31.0%] top-[29.5%] w-4 h-4 sm:w-5 sm:h-5 lg:w-7 lg:h-7 rounded-full bg-white/90 border border-sky-200 sm:border-2 shadow-[0_0_16px_rgba(56,189,248,0.7)] pointer-events-none z-25"
               style={{ willChange: 'transform, opacity', transform: 'translateZ(50px)' }}
               animate={
                 isZooming

@@ -1,25 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { motion, MotionValue, useTransform } from 'motion/react';
+import { isTouchFirstViewport } from '../utils/inputMode';
 
 interface ScrollHintProps {
   smoothedDepth: MotionValue<number>;
 }
 
-const isCompactTouchViewport = () =>
-  typeof window !== 'undefined' &&
-  window.matchMedia('(pointer: coarse)').matches &&
-  window.matchMedia('(hover: none)').matches &&
-  Math.min(window.innerWidth, window.innerHeight) <= 840 &&
-  (window.innerWidth <= 1024 || window.innerHeight <= 520);
-
 export const ScrollHint = React.memo(({ smoothedDepth }: ScrollHintProps) => {
-  const [isMobileViewport, setIsMobileViewport] = useState(
-    isCompactTouchViewport,
-  );
+  const [isTouchViewport, setIsTouchViewport] = useState(isTouchFirstViewport);
 
   useEffect(() => {
     const updateViewportHint = () => {
-      setIsMobileViewport(isCompactTouchViewport());
+      setIsTouchViewport(isTouchFirstViewport());
     };
     updateViewportHint();
     window.addEventListener('resize', updateViewportHint, { passive: true });
@@ -47,9 +39,9 @@ export const ScrollHint = React.memo(({ smoothedDepth }: ScrollHintProps) => {
         className="flex flex-col items-center gap-2"
       >
         <span className="font-display font-bold uppercase tracking-[0.22em] sm:tracking-[0.28em] text-gray-400 text-xs text-center px-4">
-          {isMobileViewport ? 'Swipe ← / → to Explore' : 'Scroll or ↑ / ↓ to Explore'}
+          {isTouchViewport ? 'Swipe ← Back · → Forward' : 'Scroll or ↑ / ↓ to Explore'}
         </span>
-        {isMobileViewport ? (
+        {isTouchViewport ? (
           <motion.span
             aria-hidden="true"
             animate={{ x: [-4, 4, -4], opacity: [0.4, 1, 0.4] }}

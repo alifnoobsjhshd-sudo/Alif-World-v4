@@ -23,6 +23,7 @@ import { Interactive3DCard } from '../components/Interactive3DCard';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { MarineInteractiveHotspot } from '../components/MarineInteractiveHotspot';
 import { dreamAudio } from '../utils/audio';
+import { isTouchFirstViewport } from '../utils/inputMode';
 
 // Exact HD Scene Images matching the Reference Images provided by the user
 import scene1Img from '../assets/images/scene-1-hd.jpg';
@@ -66,8 +67,13 @@ export const AboutMePage: React.FC = () => {
   });
   const scrollVelocity = useVelocity(smoothedDepth);
 
-  // Touch drag tracking for mobile
+  // Touch drag tracking
+  const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const touchLastX = useRef<number | null>(null);
+  const touchLastY = useRef<number | null>(null);
+  const touchAxis = useRef<'horizontal' | 'vertical' | null>(null);
+  const touchStartedOnControl = useRef(false);
 
   // ── Audio Lifecycle & Sound Effects ───────────────────────────────────────
   useEffect(() => {
@@ -128,33 +134,79 @@ export const AboutMePage: React.FC = () => {
   // ── Controls: Wheel, Touch Drag, Keyboard ─────────────────────────────────
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
+      if (isContactOpen) return;
       e.preventDefault();
-      const deltaY = e.deltaY;
-      const delta = Math.max(-100, Math.min(100, deltaY));
+      const scrollDelta = isTouchFirstViewport() ? e.deltaX : e.deltaY;
+      if (scrollDelta === 0) return;
+      const delta = Math.max(-100, Math.min(100, scrollDelta));
       dreamAudio.updateScrollingBubbleSound(delta * 8.5);
       const current = depthValue.get();
       depthValue.set(Math.max(0, Math.min(MAX_MARINE_DEPTH, current + delta * 8.5)));
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        touchStartY.current = e.touches[0].clientY;
-      }
+      const target = e.target instanceof Element ? e.target : null;
+      touchStartedOnControl.current =
+        isContactOpen ||
+        Boolean(target?.closest('button, a, input, textarea, select, [role="button"], [role="dialog"], [contenteditable="true"]'));
+      touchAxis.current = null;
+      if (touchStartedOnControl.current) return;
+
+      const touch = e.touches[0];
+      if (!touch) return;
+      touchStartX.current = touch.clientX;
+      touchStartY.current = touch.clientY;
+      touchLastX.current = touch.clientX;
+      touchLastY.current = touch.clientY;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY.current === null || e.touches.length === 0) return;
-      const currentY = e.touches[0].clientY;
-      const diffY = touchStartY.current - currentY;
-      touchStartY.current = currentY;
-      dreamAudio.updateScrollingBubbleSound(diffY * 11.0);
+      if (
+        touchStartedOnControl.current ||
+        isContactOpen ||
+        touchStartX.current === null ||
+        touchStartY.current === null ||
+        touchLastX.current === null ||
+        touchLastY.current === null
+      ) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const currentX = touch.clientX;
+      const currentY = touch.clientY;
+      const deltaX = currentX - touchLastX.current;
+      const deltaY = touchLastY.current - currentY;
+      const isTouchViewport = isTouchFirstViewport();
+
+      if (isTouchViewport && touchAxis.current === null) {
+        const totalX = currentX - touchStartX.current;
+        const totalY = currentY - touchStartY.current;
+        if (Math.max(Math.abs(totalX), Math.abs(totalY)) >= 8) {
+          touchAxis.current =
+            Math.abs(totalX) >= Math.abs(totalY) ? 'horizontal' : 'vertical';
+        }
+      }
+
+      touchLastX.current = currentX;
+      touchLastY.current = currentY;
+      if (isTouchViewport && e.cancelable) e.preventDefault();
+      if (isTouchViewport && touchAxis.current !== 'horizontal') return;
+
+      const delta = isTouchViewport ? deltaX : deltaY;
+      if (delta === 0) return;
+      dreamAudio.updateScrollingBubbleSound(delta * 11.0);
 
       const current = depthValue.get();
-      depthValue.set(Math.max(0, Math.min(MAX_MARINE_DEPTH, current + diffY * 11.0)));
+      depthValue.set(Math.max(0, Math.min(MAX_MARINE_DEPTH, current + delta * 11.0)));
     };
 
     const handleTouchEnd = () => {
+      touchStartedOnControl.current = false;
+      touchAxis.current = null;
+      touchStartX.current = null;
       touchStartY.current = null;
+      touchLastX.current = null;
+      touchLastY.current = null;
       dreamAudio.stopScrollingBubbleSound();
     };
 
@@ -173,8 +225,9 @@ export const AboutMePage: React.FC = () => {
 
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
@@ -182,9 +235,10 @@ export const AboutMePage: React.FC = () => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [depthValue]);
+  }, [depthValue, isContactOpen]);
 
   const handleGlideTo = (targetDepth: number) => {
     dreamAudio.playDreamRipple();
