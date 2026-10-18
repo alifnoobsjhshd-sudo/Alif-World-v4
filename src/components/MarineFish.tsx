@@ -54,12 +54,23 @@ export const MarineFish: React.FC<MarineFishProps> = ({
       }
     };
 
+    const handleVirtual = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number }>;
+      if (!ev.detail) return;
+      const container = document.getElementById('auto-landscape-container');
+      const w = container?.clientWidth || window.innerWidth || 1;
+      const normalized = (ev.detail.x / w) * 2 - 1;
+      targetPointerX.current = Math.max(-16, Math.min(16, normalized * 16));
+    };
+
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('virtual-cursor-move', handleVirtual);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('virtual-cursor-move', handleVirtual);
     };
   }, []);
 

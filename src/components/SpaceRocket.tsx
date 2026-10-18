@@ -11,16 +11,32 @@ export const SpaceRocket: React.FC<SpaceRocketProps> = ({ scrollVelocity, isSpee
   const [steering, setSteering] = useState({ x: 0, roll: 0 });
 
   useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
-      const normX = (e.clientX / window.innerWidth) - 0.5; // -0.5 (left) to 0.5 (right)
+    const applySteer = (clientX: number, width: number) => {
+      const normX = (clientX / width) - 0.5; // -0.5 (left) to 0.5 (right)
       setSteering({
         x: normX * 36, // ±18px subtle lateral translation
         roll: normX * 5.5, // ±2.75deg subtle aerospace banking
       });
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      applySteer(e.clientX, window.innerWidth || 1);
+    };
+
+    const handleVirtual = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number }>;
+      if (!ev.detail) return;
+      const container = document.getElementById('auto-landscape-container');
+      const w = container?.clientWidth || window.innerWidth || 1;
+      applySteer(ev.detail.x, w);
+    };
+
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    return () => window.removeEventListener('pointermove', handlePointerMove);
+    window.addEventListener('virtual-cursor-move', handleVirtual);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('virtual-cursor-move', handleVirtual);
+    };
   }, []);
 
   // ── DYNAMIC TAIL EXHAUST: ONLY EMITS WHEN SCROLLING FORWARD ────────────────

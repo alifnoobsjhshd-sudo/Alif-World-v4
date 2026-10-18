@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Volume2, VolumeX } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
+import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
 
 export const ProjectsPage = React.memo(({ initialLoading }: { initialLoading: boolean }) => {
   const navigate = useNavigate();
@@ -263,6 +264,7 @@ export const ProjectsPage = React.memo(({ initialLoading }: { initialLoading: bo
             <span>Watch Story</span>
             <span>☁️</span>
           </motion.button>
+          <MobileCursorToggleButton size="sm" />
           <motion.button
             type="button"
             onClick={toggleSound}

@@ -145,6 +145,10 @@ export const AboutMePage: React.FC = () => {
     };
 
     const handleTouchStart = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) {
+        touchStartedOnControl.current = true;
+        return;
+      }
       const target = e.target instanceof Element ? e.target : null;
       touchStartedOnControl.current =
         isContactOpen ||
@@ -161,6 +165,7 @@ export const AboutMePage: React.FC = () => {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
       if (
         touchStartedOnControl.current ||
         isContactOpen ||

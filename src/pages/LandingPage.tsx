@@ -8,6 +8,7 @@ import { CartoonCloudTransition } from '../components/CartoonCloudTransition';
 import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { LetsDriveButton } from '../components/LetsDriveButton';
+import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
 import landingBgUser from '../assets/images/landing_bg_user.jpg';
 import journeyCutsceneUrl from '../../cutscenes-1.mp4';
 
@@ -50,7 +51,7 @@ export const LandingPage: React.FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Mouse move listener: continuously updates 3D parallax on pointer movement
+  // Mouse move listener: continuously updates 3D parallax on pointer & virtual cursor movement
   useEffect(() => {
     const handlePointerMove = (e: MouseEvent) => {
       const { innerWidth, innerHeight } = window;
@@ -61,11 +62,25 @@ export const LandingPage: React.FC = () => {
       mouseY.set(ny);
     };
 
+    const handleVirtualMove = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number }>;
+      if (!ev.detail) return;
+      const container = document.getElementById('auto-landscape-container');
+      const w = container?.clientWidth || window.innerWidth || 1;
+      const h = container?.clientHeight || window.innerHeight || 1;
+      const nx = (ev.detail.x / w - 0.5) * 2;
+      const ny = (ev.detail.y / h - 0.5) * 2;
+      mouseX.set(Math.max(-1, Math.min(1, nx)));
+      mouseY.set(Math.max(-1, Math.min(1, ny)));
+    };
+
     window.addEventListener('mousemove', handlePointerMove, { passive: true });
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('virtual-cursor-move', handleVirtualMove);
     return () => {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('virtual-cursor-move', handleVirtualMove);
     };
   }, [mouseX, mouseY]);
 
@@ -304,57 +319,78 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* ── FOREGROUND LAYER: RISING DREAM BUBBLES & MAIN DREAM CLOUD ────── */}
-            {/* Rising smoothly diagonally UP and LEFT from character's head */}
-            {/* Tiny Bubble 1 (Directly touching character's head on desk) */}
+            {/* Perfectly and properly attached from sleeping character's head (at X=39.5%, Y=43.0%) into main dream cloud */}
+            
+            {/* Bubble 1: Attached directly to the character's head on the desk */}
             <motion.div
-              className="absolute left-[42.6%] top-[39.4%] w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3.5 lg:h-3.5 rounded-full bg-white/85 border border-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.6)] pointer-events-none z-25"
-              style={{ willChange: 'transform, opacity', transform: 'translateZ(22px)' }}
+              className="absolute left-[39.0%] top-[41.2%] w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3.5 lg:h-3.5 rounded-full bg-gradient-to-br from-white/95 via-sky-100/90 to-sky-300/80 border border-sky-300/80 shadow-[0_0_8px_rgba(56,189,248,0.7)] pointer-events-none z-25"
+              style={{ willChange: 'transform, opacity', transform: 'translateZ(24px)' }}
               animate={
                 isZooming
                   ? { scale: [1, 1.6, 2.5], opacity: [0.85, 1, 0.2] }
-                  : { y: [-2, 2, -2], scale: [0.9, 1.1, 0.9] }
+                  : { y: [-1.5, 1.5, -1.5], scale: [0.92, 1.08, 0.92] }
               }
               transition={
                 isZooming
                   ? { duration: 3.4, ease: 'easeOut' }
                   : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
               }
-            />
+            >
+              <div className="w-0.5 h-0.5 rounded-full bg-white absolute top-0.5 left-0.5 opacity-95" />
+            </motion.div>
 
-            {/* Bubble 2 (Small bubble rising up-left towards cloud) */}
+            {/* Bubble 2: Rising smoothly along the diagonal path */}
             <motion.div
-              className="absolute left-[35.0%] top-[35.5%] w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 rounded-full bg-white/85 border border-sky-200 sm:border-2 shadow-[0_0_12px_rgba(56,189,248,0.65)] pointer-events-none z-25"
-              style={{ willChange: 'transform, opacity', transform: 'translateZ(35px)' }}
+              className="absolute left-[34.8%] top-[37.4%] w-3 h-3 sm:w-3.5 sm:h-3.5 lg:w-5 lg:h-5 rounded-full bg-gradient-to-br from-white/95 via-sky-100/90 to-sky-300/80 border border-sky-300/90 sm:border-2 shadow-[0_0_12px_rgba(56,189,248,0.75)] pointer-events-none z-25"
+              style={{ willChange: 'transform, opacity', transform: 'translateZ(38px)' }}
               animate={
                 isZooming
                   ? { scale: [1, 1.7, 2.9], opacity: [0.85, 1, 0.2] }
-                  : { y: [-3, 3, -3], scale: [0.95, 1.1, 0.95], x: [-1.5, 1.5, -1.5] }
+                  : { y: [-2.5, 2.5, -2.5], scale: [0.95, 1.1, 0.95], x: [-1, 1, -1] }
               }
               transition={
                 isZooming
-                  ? { duration: 3.8, delay: 0.2, ease: 'easeOut' }
-                  : { duration: 3.6, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }
+                  ? { duration: 3.8, delay: 0.15, ease: 'easeOut' }
+                  : { duration: 3.4, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }
               }
             >
-              <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white absolute top-1 left-1 opacity-90" />
+              <div className="w-1 h-1 rounded-full bg-white absolute top-0.5 left-0.5 opacity-95" />
             </motion.div>
 
-            {/* Bubble 3 (Medium bubble mid-way between head and cloud) */}
+            {/* Bubble 3: Continuing smoothly midway towards the dream cloud */}
             <motion.div
-              className="hidden lg:block absolute left-[31.0%] top-[29.5%] w-4 h-4 sm:w-5 sm:h-5 lg:w-7 lg:h-7 rounded-full bg-white/90 border border-sky-200 sm:border-2 shadow-[0_0_16px_rgba(56,189,248,0.7)] pointer-events-none z-25"
-              style={{ willChange: 'transform, opacity', transform: 'translateZ(50px)' }}
+              className="absolute left-[30.5%] top-[33.5%] w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-6.5 lg:h-6.5 rounded-full bg-gradient-to-br from-white/95 via-sky-100/90 to-sky-300/85 border border-sky-200 sm:border-2 shadow-[0_0_15px_rgba(56,189,248,0.8)] pointer-events-none z-25"
+              style={{ willChange: 'transform, opacity', transform: 'translateZ(52px)' }}
               animate={
                 isZooming
                   ? { scale: [1, 1.9, 3.4], opacity: [0.9, 1, 0.2] }
-                  : { y: [-4, 4, -4], scale: [0.98, 1.06, 0.98], x: [1.5, -1.5, 1.5] }
+                  : { y: [-3.5, 3.5, -3.5], scale: [0.97, 1.07, 0.97], x: [1, -1, 1] }
               }
               transition={
                 isZooming
-                  ? { duration: 4.2, delay: 0.35, ease: 'easeOut' }
-                  : { duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }
+                  ? { duration: 4.2, delay: 0.3, ease: 'easeOut' }
+                  : { duration: 3.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }
               }
             >
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white absolute top-1 left-1.5 sm:top-1.5 sm:left-2 opacity-95" />
+              <div className="w-1.5 h-1.5 rounded-full bg-white absolute top-1 left-1 opacity-95" />
+            </motion.div>
+
+            {/* Bubble 4: Entering directly into the base of the Main Dream Cloud */}
+            <motion.div
+              className="absolute left-[26.0%] top-[29.5%] w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 rounded-full bg-gradient-to-br from-white/95 via-sky-100/90 to-sky-300/85 border border-sky-200 sm:border-2 shadow-[0_0_18px_rgba(56,189,248,0.85)] pointer-events-none z-25"
+              style={{ willChange: 'transform, opacity', transform: 'translateZ(66px)' }}
+              animate={
+                isZooming
+                  ? { scale: [1, 2.0, 3.8], opacity: [0.9, 1, 0.2] }
+                  : { y: [-4, 4, -4], scale: [0.98, 1.06, 0.98], x: [-1, 1, -1] }
+              }
+              transition={
+                isZooming
+                  ? { duration: 4.4, delay: 0.45, ease: 'easeOut' }
+                  : { duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.45 }
+              }
+            >
+              <div className="w-2 h-2 rounded-full bg-white absolute top-1 left-1 opacity-95" />
             </motion.div>
 
             {/* ── MAIN VIBRANT DREAM BUBBLE (Desktop placement above character) ── */}
@@ -531,12 +567,13 @@ export const LandingPage: React.FC = () => {
         videoSrc={journeyCutsceneUrl}
       />
 
-      {/* ── TOP RIGHT AUDIO MUTE BUTTON (Magnetic Shimmer Stroke) ──────────── */}
+      {/* ── TOP RIGHT CONTROLS: CURSOR TOGGLE & AUDIO MUTE BUTTON ──────────── */}
       <motion.div
-        className="fixed top-4 right-4 sm:top-5 sm:right-5 md:top-6 md:right-6 z-40"
+        className="fixed top-4 right-4 sm:top-5 sm:right-5 md:top-6 md:right-6 z-40 flex items-center gap-2 pointer-events-auto"
         animate={isZooming ? { opacity: 0, pointerEvents: 'none' } : { opacity: 1 }}
         transition={{ duration: 0.2 }}
       >
+        <MobileCursorToggleButton />
         <MagneticShimmerButton
           variant="glass"
           size="icon"

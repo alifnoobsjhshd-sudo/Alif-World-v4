@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMotionValue, useSpring, useTransform } from 'motion/react';
+import { getStageDimensions } from '../context/MobileVirtualCursorContext';
 
 type MouseCallback = (x: number, y: number) => void;
 const subscribers = new Set<MouseCallback>();
@@ -23,16 +24,34 @@ function setupGlobalMouseListener() {
     { passive: true }
   );
 
+  window.addEventListener('virtual-cursor-move', (e: Event) => {
+    if (subscribers.size === 0) return;
+    const ev = e as CustomEvent<{ x: number; y: number }>;
+    if (!ev.detail) return;
+    const { width, height } = getStageDimensions();
+    const x = (ev.detail.x / (width || 1) - 0.5) * 2;
+    const y = (ev.detail.y / (height || 1) - 0.5) * 2;
+    const clampedX = Math.max(-1, Math.min(1, x));
+    const clampedY = Math.max(-1, Math.min(1, y));
+    subscribers.forEach((cb) => cb(clampedX, clampedY));
+  });
+
   document.addEventListener('mouseleave', () => {
-    subscribers.forEach((cb) => cb(0, 0));
+    const isVirtualCursorActive = typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active');
+    if (!isVirtualCursorActive) {
+      subscribers.forEach((cb) => cb(0, 0));
+    }
   });
 }
 
 export function useDesktopCharacterParallax() {
-  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+  const checkDesktop = () => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia('(pointer: fine)').matches && window.innerWidth >= 768;
-  });
+    const isVirtualCursorActive = typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active');
+    return isVirtualCursorActive || (window.matchMedia('(pointer: fine)').matches && window.innerWidth >= 768);
+  };
+
+  const [isDesktop, setIsDesktop] = useState<boolean>(checkDesktop);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -41,18 +60,20 @@ export function useDesktopCharacterParallax() {
     if (typeof window === 'undefined') return;
 
     const mq = window.matchMedia('(pointer: fine)');
-    const checkDesktop = () => {
-      setIsDesktop(mq.matches && window.innerWidth >= 768);
+    const updateDesktopState = () => {
+      setIsDesktop(checkDesktop());
     };
-    checkDesktop();
+    updateDesktopState();
 
-    window.addEventListener('resize', checkDesktop);
-    mq.addEventListener?.('change', checkDesktop);
+    window.addEventListener('resize', updateDesktopState);
+    window.addEventListener('mobile-cursor-state-change', updateDesktopState);
+    mq.addEventListener?.('change', updateDesktopState);
 
     setupGlobalMouseListener();
 
     const onMouse: MouseCallback = (x, y) => {
-      if (!mq.matches || window.innerWidth < 768) {
+      const isVirtualCursorActive = typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active');
+      if (!isVirtualCursorActive && (!mq.matches || window.innerWidth < 768)) {
         mouseX.set(0);
         mouseY.set(0);
         return;
@@ -65,8 +86,9 @@ export function useDesktopCharacterParallax() {
 
     return () => {
       subscribers.delete(onMouse);
-      window.removeEventListener('resize', checkDesktop);
-      mq.removeEventListener?.('change', checkDesktop);
+      window.removeEventListener('resize', updateDesktopState);
+      window.removeEventListener('mobile-cursor-state-change', updateDesktopState);
+      mq.removeEventListener?.('change', updateDesktopState);
     };
   }, [mouseX, mouseY]);
 

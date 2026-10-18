@@ -21,6 +21,7 @@ import { Section } from '../components/Section';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
 import { isTouchFirstViewport } from '../utils/inputMode';
 
 const MAX_SPACE_DEPTH = 36000;
@@ -217,6 +218,10 @@ export const ExploreWorksPage: React.FC = () => {
     };
 
     const handleTouchStart = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) {
+        touchStartedOnControl.current = true;
+        return;
+      }
       const target = e.target instanceof Element ? e.target : null;
       touchStartedOnControl.current = Boolean(
         target?.closest('button, a, input, textarea, select, [role="button"], [role="dialog"], [contenteditable="true"]'),
@@ -233,6 +238,7 @@ export const ExploreWorksPage: React.FC = () => {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
       if (
         touchStartedOnControl.current ||
         touchStartY.current === null ||
@@ -517,8 +523,9 @@ export const ExploreWorksPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Audio Mute/Unmute */}
-        <div className="pointer-events-auto">
+        {/* Audio Mute/Unmute & Mobile Cursor Toggle */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <MobileCursorToggleButton />
           <MagneticShimmerButton
             variant="glass"
             size="icon"

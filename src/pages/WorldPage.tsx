@@ -5,6 +5,7 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
+import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
 import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
 import worldCutsceneUrl from '../../cutscenes-2.mp4';
 
@@ -35,7 +36,12 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
   const [zoomOrigin, setZoomOrigin] = useState<string>('50% 50%');
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const [hoveredIsland, setHoveredIsland] = useState<'story' | 'about' | 'works' | null>(null);
-  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+  const checkDesktop = () => {
+    if (typeof window === 'undefined') return false;
+    const isVirtualCursorActive = typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active');
+    return isVirtualCursorActive || window.innerWidth >= 1024;
+  };
+  const [isDesktop, setIsDesktop] = useState(checkDesktop);
   const [isEntering, setIsEntering] = useState(false);
   const [hasCutsceneEnded, setHasCutsceneEnded] = useState(false);
   const [bgSrc, setBgSrc] = useState(WOOD_BOARD_LOCAL_URL);
@@ -43,12 +49,16 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
 
   // Responsive tracker
   useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 1024);
+    const handleUpdate = () => {
+      setIsDesktop(checkDesktop());
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    handleUpdate();
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('mobile-cursor-state-change', handleUpdate);
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('mobile-cursor-state-change', handleUpdate);
+    };
   }, []);
 
   // ── Unified 3D Parallax Tracking via Mouse Movement ──
@@ -273,8 +283,9 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
           </MagneticShimmerButton>
         </div>
 
-        {/* Right: Audio Mute Button (Magnetic Shimmer Stroke) */}
-        <div className="pointer-events-auto">
+        {/* Right: Controls (Mobile Cursor Toggle & Audio Mute Button) */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <MobileCursorToggleButton />
           <MagneticShimmerButton
             variant="glass"
             size="icon"

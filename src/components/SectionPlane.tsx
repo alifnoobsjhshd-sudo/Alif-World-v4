@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { STORY_SCENES, SCENE_STEP } from '../data/storyline';
 import { ChevronUp, ChevronDown, ArrowLeft, Volume2, VolumeX, FastForward } from 'lucide-react';
 import { dreamAudio } from '../utils/audio';
+import { MobileCursorToggleButton } from './MobileCursorToggleButton';
 
 interface SectionPlaneProps {
   activeSection: number;
@@ -123,6 +124,9 @@ export const SectionPlane = React.memo(({ activeSection, depthValue, fromLetsDri
               <FastForward className="w-3.5 h-3.5 text-sky-100 shrink-0" />
             </motion.button>
           )}
+
+          {/* Mobile Virtual Cursor Switch Toggle */}
+          <MobileCursorToggleButton size="sm" />
 
           {/* Soundtrack Mute Toggle */}
           <motion.button

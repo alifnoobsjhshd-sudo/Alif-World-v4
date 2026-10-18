@@ -38,6 +38,9 @@ import { dreamAudio } from './utils/audio';
 import { CustomCursor } from './components/CustomCursor';
 import { VirtualCursorPad } from './components/VirtualCursorPad';
 import { GlobalChatButton } from './components/GlobalChatButton';
+import { MobileVirtualCursorProvider } from './context/MobileVirtualCursorContext';
+import { MobileVirtualCursorOverlay } from './components/MobileVirtualCursorOverlay';
+import { MobileCursorModeSwitchOverlay } from './components/MobileCursorModeSwitchOverlay';
 import { AutoLandscapeWrapper } from './components/AutoLandscapeWrapper';
 import { MobileLandscapeNotice } from './components/MobileLandscapeNotice';
 import { isTouchFirstViewport } from './utils/inputMode';
@@ -203,6 +206,11 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
   useEffect(() => {
     let hasRedirected = false;
     const onTouchStart = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) {
+        touchStartedOnControl.current = true;
+        touchVel.current = 0;
+        return;
+      }
       const target = e.target instanceof Element ? e.target : null;
       touchStartedOnControl.current =
         isContactOpen ||
@@ -229,6 +237,7 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
       if (touchStartedOnControl.current || isContactOpen || isRocketLaunching) return;
       const touch = e.touches[0];
       if (!touch) return;
@@ -530,7 +539,7 @@ export default function App() {
   const { pathname } = useLocation();
 
   return (
-    <>
+    <MobileVirtualCursorProvider>
       {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
       <MobileLandscapeNotice />
 
@@ -538,6 +547,8 @@ export default function App() {
       <AutoLandscapeWrapper>
         <CustomCursor />
         <VirtualCursorPad />
+        <MobileVirtualCursorOverlay />
+        <MobileCursorModeSwitchOverlay />
         <GlobalChatButton />
         <AnimatePresence>
           {initialLoading && pathname !== '/chat' && (
@@ -576,6 +587,6 @@ export default function App() {
         />
       </Routes>
     </AutoLandscapeWrapper>
-    </>
+    </MobileVirtualCursorProvider>
   );
 }

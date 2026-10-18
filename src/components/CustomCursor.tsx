@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { isVirtualCursorEnabled } from './VirtualCursorPad';
+import { useMobileVirtualCursor } from '../context/MobileVirtualCursorContext';
 
 interface CursorBubble {
   id: number;
@@ -13,6 +14,10 @@ interface CursorBubble {
 
 export const CustomCursor: React.FC = () => {
   const location = useLocation();
+  const { isSupported: isMobileSupported, isCursorOn: isMobileCursorOn, cursorPos: mobileCursorPos } =
+    useMobileVirtualCursor();
+  const isMobileCursorActive = isMobileSupported && isMobileCursorOn;
+
   const [hasMouse, setHasMouse] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     return !window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(pointer: fine)').matches;
@@ -21,7 +26,8 @@ export const CustomCursor: React.FC = () => {
   const [isHovering, setIsHovering] = useState(false);
   const [isClicking, setIsClicking] = useState(false);
 
-  // Responsive screen ratio tracking: cursor is visible exclusively on desktop ratios
+  // Responsive screen ratio tracking: cursor is visible exclusively on desktop ratios by default,
+  // OR when mobile virtual cursor is explicitly switched ON
   const checkDesktopRatio = () => {
     if (typeof window === 'undefined') return true;
     const isDesktopWidth = window.innerWidth >= 1024;
@@ -67,9 +73,19 @@ export const CustomCursor: React.FC = () => {
   const isWorld = path.startsWith('/world');
   const isJourney = path.startsWith('/journey') || path.startsWith('/story');
   const isCosmic = path.startsWith('/explore-work') || path.startsWith('/space');
-  const isChat = path.startsWith('/chat');
 
-  const canTrackCursor = hasMouse || isVirtualCursorEnabled();
+  const canTrackCursor = hasMouse || isVirtualCursorEnabled() || isMobileCursorActive;
+
+  // Sync position immediately when mobile virtual cursor activates
+  useEffect(() => {
+    if (isMobileCursorActive) {
+      mousePos.current.x = mobileCursorPos.x;
+      mousePos.current.y = mobileCursorPos.y;
+      trailPos.current.x = mobileCursorPos.x;
+      trailPos.current.y = mobileCursorPos.y;
+      setIsVisible(true);
+    }
+  }, [isMobileCursorActive, mobileCursorPos.x, mobileCursorPos.y]);
 
   // ── Hide native cursor on desktop when custom cursor is active ──
   useEffect(() => {
@@ -88,6 +104,7 @@ export const CustomCursor: React.FC = () => {
     if (typeof window === 'undefined') return;
 
     const handlePointerDetected = (e: MouseEvent | PointerEvent) => {
+      if (isMobileCursorActive) return;
       if ((e as PointerEvent).pointerType === 'touch') return;
       setHasMouse(true);
       setIsVisible(true);
@@ -100,7 +117,7 @@ export const CustomCursor: React.FC = () => {
       window.removeEventListener('pointermove', handlePointerDetected);
       window.removeEventListener('mousemove', handlePointerDetected);
     };
-  }, []);
+  }, [isMobileCursorActive]);
 
   useEffect(() => {
     if (!canTrackCursor) return;
@@ -126,10 +143,12 @@ export const CustomCursor: React.FC = () => {
     };
 
     const handleMouseMove = (e: MouseEvent) => {
+      // When mobile virtual cursor is active, ignore browser mousemove entirely
+      // to avoid any tap or gesture anywhere on screen attracting or jumping the cursor!
+      if (isMobileCursorActive) return;
       if (typeof e.clientX !== 'number' || isNaN(e.clientX)) return;
 
       if (mousePos.current.x < 0) {
-        // Prevent snapping from top-left corner on first load
         trailPos.current.x = e.clientX;
         trailPos.current.y = e.clientY;
       }
@@ -142,7 +161,7 @@ export const CustomCursor: React.FC = () => {
       updateHoverState(target);
     };
 
-    // Virtual cursor sync: keeps themed custom cursor perfectly synced with virtual trackpad
+    // Virtual cursor sync: keeps themed custom cursor perfectly synced with virtual movement
     const handleVirtualCursorMove = (e: Event) => {
       const ev = e as CustomEvent<{ x: number; y: number; isHovering?: boolean }>;
       if (!ev.detail || typeof ev.detail.x !== 'number') return;
@@ -171,6 +190,7 @@ export const CustomCursor: React.FC = () => {
     };
     const handleMouseEnterWindow = () => setIsVisible(true);
     const handleMouseLeaveWindow = (e: MouseEvent) => {
+      if (isMobileCursorActive) return; // Keep visible on mobile
       if (
         e.clientX <= 0 ||
         e.clientX >= window.innerWidth ||
@@ -189,32 +209,29 @@ export const CustomCursor: React.FC = () => {
     document.addEventListener('mouseenter', handleMouseEnterWindow);
     document.addEventListener('mouseleave', handleMouseLeaveWindow);
 
-    // High performance RAF loop with smooth trailing lerp for the circle outline (decreased delay)
+    // High performance RAF loop with smooth trailing lerp for the circle outline
     const renderLoop = (time: number) => {
       const dx = mousePos.current.x - trailPos.current.x;
       const dy = mousePos.current.y - trailPos.current.y;
 
-      // ── DECREASED DELAY LERP FOR CIRCLE OUTLINE (~0.38) ──
-      // Chases the cursor tightly with snappy, responsive fluid follow
       const lerpFactor = isHovering ? 0.46 : 0.38;
       trailPos.current.x += dx * lerpFactor;
       trailPos.current.y += dy * lerpFactor;
       vel.current.x = dx * lerpFactor;
       vel.current.y = dy * lerpFactor;
 
-      // Update immediate dot / pointer (instant, zero delay, follows real mouse directly)
-      // Tip of the pointer arrow SVG is at (3.5px, 3.5px), so translate by -3.5px to align tip with mousePos
+      // Update immediate dot / pointer arrow SVG
       if (dotRef.current) {
         dotRef.current.style.transform = `translate3d(${mousePos.current.x}px, ${mousePos.current.y}px, 0) translate(-3.5px, -3.5px)`;
       }
 
-      // Update trailing circle outline ring (smooth delayed follow centered around cursor)
+      // Update trailing circle outline ring
       if (ringRef.current) {
         ringRef.current.style.transform = `translate3d(${trailPos.current.x}px, ${trailPos.current.y}px, 0) translate(-50%, -50%)`;
       }
 
       // ── ABOUT ME PAGE: CONTINUOUS BUBBLE STREAM FROM CURSOR ──
-      if (isAboutMe && !isHovering && isVisible) {
+      if (isAboutMe && !isHovering && (isVisible || isMobileCursorActive)) {
         if (time - lastBubbleTime.current > 110) {
           lastBubbleTime.current = time;
           bubbleIdCounter.current += 1;
@@ -244,7 +261,7 @@ export const CustomCursor: React.FC = () => {
       document.removeEventListener('mouseenter', handleMouseEnterWindow);
       document.removeEventListener('mouseleave', handleMouseLeaveWindow);
     };
-  }, [canTrackCursor, isVisible, isAboutMe, isHovering]);
+  }, [canTrackCursor, isVisible, isAboutMe, isHovering, isMobileCursorActive]);
 
   // Periodic bubble cleanup
   useEffect(() => {
@@ -255,14 +272,17 @@ export const CustomCursor: React.FC = () => {
     return () => clearTimeout(timer);
   }, [bubbles]);
 
-  // Return null if cannot track or on mobile screen ratio
-  if (!canTrackCursor || !isDesktopRatio) return null;
+  // Visible on desktop ratio OR when mobile virtual cursor is switched ON
+  const shouldRender = (canTrackCursor && isDesktopRatio) || isMobileCursorActive;
+  if (!shouldRender) return null;
 
   return (
     <div
-      className={`fixed inset-0 pointer-events-none z-[99999] transition-opacity duration-300 hidden lg:block ${
-        isVisible ? 'opacity-100' : 'opacity-0'
-      }`}
+      id="custom-cursor-root"
+      data-cursor-ignore="true"
+      className={`fixed inset-0 pointer-events-none z-[99999] transition-opacity duration-300 ${
+        isMobileCursorActive ? 'block' : 'hidden lg:block'
+      } ${isVisible || isMobileCursorActive ? 'opacity-100' : 'opacity-0'}`}
       aria-hidden="true"
     >
       {/* ── 1. ABOUT ME PAGE: RISING BUBBLES FROM CURSOR ── */}
@@ -284,12 +304,13 @@ export const CustomCursor: React.FC = () => {
           </div>
         ))}
 
-      {/* ── 2. TRAILING CIRCLE OUTLINE (CHASES MOUSE WITH DECREASED DELAY, GLASSY INSIDE BLUR) ── */}
-      {/* Exclusively visible for desktop screen ratio; strictly hidden for mobile screen ratio */}
-      {isDesktopRatio && (
+      {/* ── 2. TRAILING CIRCLE OUTLINE (CHASES CURSOR WITH GLASSY INSIDE BLUR) ── */}
+      {(isDesktopRatio || isMobileCursorActive) && (
         <div
           ref={ringRef}
-          className="fixed top-0 left-0 pointer-events-none will-change-transform hidden lg:block"
+          className={`fixed top-0 left-0 pointer-events-none will-change-transform ${
+            isMobileCursorActive ? 'block' : 'hidden lg:block'
+          }`}
           style={{ transform: 'translate3d(-100px, -100px, 0)' }}
         >
           {/* 2A. LANDING: White Glassy Circle Outline with Inside Blur */}
@@ -372,19 +393,20 @@ export const CustomCursor: React.FC = () => {
         </div>
       )}
 
-      {/* ── 3. IMMEDIATE CURSOR: EXACT VIRTUAL CURSOR DESIGN & EXACT CLICK ANIMATION ── */}
-      {/* Exclusively visible for desktop screen ratio; strictly hidden for mobile screen ratio */}
-      {isDesktopRatio && (
+      {/* ── 3. IMMEDIATE CURSOR: ARROW SVG WITH LUMINOUS HALO & CLICK RIPPLE ── */}
+      {(isDesktopRatio || isMobileCursorActive) && (
         <div
           ref={dotRef}
-          className="fixed top-0 left-0 pointer-events-none will-change-transform z-10 hidden lg:block"
+          className={`fixed top-0 left-0 pointer-events-none will-change-transform z-10 ${
+            isMobileCursorActive ? 'block' : 'hidden lg:block'
+          }`}
           style={{ transform: 'translate3d(-100px, -100px, 0) translate(-3.5px, -3.5px)' }}
         >
           <div className="relative">
             {/* Luminous Glow Halo behind cursor arrow for high contrast on all scenes */}
             <div className="absolute -inset-1 rounded-full bg-cyan-400/50 blur-[5px]" />
 
-            {/* Main Pointer Arrow SVG (Exact design as Virtual Cursor) */}
+            {/* Main Pointer Arrow SVG */}
             <svg
               width="28"
               height="28"
@@ -403,7 +425,7 @@ export const CustomCursor: React.FC = () => {
               />
             </svg>
 
-            {/* Exact Click Ripple Indicator Animation */}
+            {/* Click Ripple Indicator Animation */}
             <AnimatePresence>
               {isClicking && (
                 <motion.div

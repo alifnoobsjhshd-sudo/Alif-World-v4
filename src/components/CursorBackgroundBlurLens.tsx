@@ -13,12 +13,23 @@ export const CursorBackgroundBlurLens: React.FC = () => {
   const springY = useSpring(mouseY, { stiffness: 450, damping: 32 });
 
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+  const [isVirtualCursor, setIsVirtualCursor] = useState(() =>
+    typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active')
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    const handleCursorState = () => {
+      setIsVirtualCursor(document.body.classList.contains('mobile-virtual-cursor-active'));
+    };
+
     window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('mobile-cursor-state-change', handleCursorState);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mobile-cursor-state-change', handleCursorState);
+    };
   }, []);
 
   useEffect(() => {
@@ -31,38 +42,54 @@ export const CursorBackgroundBlurLens: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!hasMouse) return;
-
     const handleMouseMove = (e: MouseEvent) => {
       mouseX.set(e.clientX);
       mouseY.set(e.clientY);
       if (!isVisible) setIsVisible(true);
     };
 
-    const handleMouseLeave = () => setIsVisible(false);
+    const handleVirtualMove = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number }>;
+      if (ev.detail && typeof ev.detail.x === 'number') {
+        mouseX.set(ev.detail.x);
+        mouseY.set(ev.detail.y);
+        if (!isVisible) setIsVisible(true);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (!document.body.classList.contains('mobile-virtual-cursor-active')) {
+        setIsVisible(false);
+      }
+    };
     const handleMouseEnter = () => setIsVisible(true);
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('virtual-cursor-move', handleVirtualMove);
     document.addEventListener('mouseleave', handleMouseLeave);
     document.addEventListener('mouseenter', handleMouseEnter);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('virtual-cursor-move', handleVirtualMove);
       document.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('mouseenter', handleMouseEnter);
     };
-  }, [hasMouse, isVisible, mouseX, mouseY]);
+  }, [isVisible, mouseX, mouseY]);
 
-  if (!hasMouse || !isDesktop) return null;
+  const active = (hasMouse && isDesktop) || isVirtualCursor;
+  if (!active) return null;
 
   return (
     <motion.div
       style={{
         left: springX,
         top: springY,
-        opacity: isVisible ? 1 : 0,
+        opacity: isVisible || isVirtualCursor ? 1 : 0,
       }}
-      className="fixed pointer-events-none z-[2] -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full will-change-transform hidden lg:block"
+      className={`fixed pointer-events-none z-[2] -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full will-change-transform ${
+        isVirtualCursor ? 'block' : 'hidden lg:block'
+      }`}
       aria-hidden="true"
     >
       {/* ── DECREASED SUBTLE NATURAL NEAR-SCREEN BLUR (LIGHT & NATURAL) ── */}

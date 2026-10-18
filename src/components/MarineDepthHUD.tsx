@@ -3,6 +3,7 @@ import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { dreamAudio } from '../utils/audio';
 import { isTouchFirstViewport } from '../utils/inputMode';
 import { MagneticShimmerButton } from './MagneticShimmerButton';
+import { MobileCursorToggleButton } from './MobileCursorToggleButton';
 
 interface MarineDepthHUDProps {
   onBack: () => void;
@@ -47,8 +48,9 @@ export const MarineDepthHUD: React.FC<MarineDepthHUDProps> = ({
           </MagneticShimmerButton>
         </div>
 
-        {/* Right: Audio Mute Button */}
-        <div className="pointer-events-auto">
+        {/* Right: Controls (Mobile Cursor Toggle & Audio Mute Button) */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <MobileCursorToggleButton />
           <MagneticShimmerButton
             variant="cyan"
             size="icon"

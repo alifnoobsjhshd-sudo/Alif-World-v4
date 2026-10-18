@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Orbit, Home, Compass } from 'lucide-react';
 import { SPACE_PROJECT_SECTORS } from '../data/spaceWorks';
 import { dreamAudio } from '../utils/audio';
+import { MobileCursorToggleButton } from './MobileCursorToggleButton';
 
 interface SpaceHUDProps {
   activeSectorIdx: number;
@@ -167,7 +168,7 @@ export const SpaceHUD: React.FC<SpaceHUDProps> = ({
           </button>
         </div>
 
-        {/* Right Controls: Sector Telemetry Badge & Audio Mute Toggle */}
+        {/* Right Controls: Sector Telemetry Badge, Mobile Cursor Toggle & Audio Mute Toggle */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
           {/* Active Sector Code Badge */}
@@ -175,6 +176,9 @@ export const SpaceHUD: React.FC<SpaceHUDProps> = ({
             <Orbit className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '8s' }} />
             <span>{currentSector.sectorCode}</span>
           </div>
+
+          {/* Mobile Cursor Switch Toggle */}
+          <MobileCursorToggleButton size="sm" />
 
           {/* Sound Mute Toggle */}
           <motion.button

@@ -49,8 +49,12 @@ export const MagneticShimmerButton: React.FC<MagneticShimmerButtonProps> = ({
     setIsTouchDevice(isTouch);
   }, []);
 
+  const isVirtualCursorActive = () =>
+    typeof document !== 'undefined' && document.body.classList.contains('mobile-virtual-cursor-active');
+
   const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (disabled || isTouchDevice) return;
+    if (disabled) return;
+    if (isTouchDevice && !isVirtualCursorActive()) return;
     const button = buttonRef.current;
     if (!button) return;
 
@@ -147,10 +151,10 @@ export const MagneticShimmerButton: React.FC<MagneticShimmerButtonProps> = ({
       title={title}
       aria-label={ariaLabel}
       style={{
-        x: isTouchDevice ? 0 : smoothX,
-        y: isTouchDevice ? 0 : smoothY,
-        rotateX: isTouchDevice ? 0 : rotateX,
-        rotateY: isTouchDevice ? 0 : rotateY,
+        x: isTouchDevice && !isVirtualCursorActive() ? 0 : smoothX,
+        y: isTouchDevice && !isVirtualCursorActive() ? 0 : smoothY,
+        rotateX: isTouchDevice && !isVirtualCursorActive() ? 0 : rotateX,
+        rotateY: isTouchDevice && !isVirtualCursorActive() ? 0 : rotateY,
         transformStyle: 'preserve-3d',
         ...style,
       }}
@@ -177,7 +181,7 @@ export const MagneticShimmerButton: React.FC<MagneticShimmerButtonProps> = ({
       </div>
 
       {/* ── 2. DYNAMIC CURSOR SPOTLIGHT (Follows cursor smoothly without box artifacts) ── */}
-      {isHovered && !isTouchDevice && (
+      {isHovered && (!isTouchDevice || isVirtualCursorActive()) && (
         <div
           className="absolute inset-0 pointer-events-none transition-opacity duration-200"
           style={{

@@ -20,7 +20,12 @@ export default defineConfig(({mode}) => {
   if (!process.env.GEMINI_MODEL && env.GEMINI_MODEL) {
     process.env.GEMINI_MODEL = env.GEMINI_MODEL;
   }
-  const virtualCursorEnabled = [env.CURSER, env.VITE_CURSER].some(
+  const virtualCursorEnabled = [
+    env.CURSER,
+    env.VITE_CURSER,
+    process.env.CURSER,
+    process.env.VITE_CURSER,
+  ].some(
     (value) => value?.trim().toLowerCase() === 'true',
   );
   return {
@@ -36,6 +41,8 @@ export default defineConfig(({mode}) => {
     ],
     define: {
       'process.env.CURSER': JSON.stringify(String(virtualCursorEnabled)),
+      'import.meta.env.VITE_CURSER': JSON.stringify(String(virtualCursorEnabled)),
+      'import.meta.env.CURSER': JSON.stringify(String(virtualCursorEnabled)),
     },
     resolve: {
       alias: {
