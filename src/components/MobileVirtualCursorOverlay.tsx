@@ -107,7 +107,7 @@ export const MobileVirtualCursorOverlay: React.FC = () => {
 
     scrollIntervalRef.current = setInterval(() => {
       triggerScroll(deltaY);
-    }, 70);
+    }, 60);
   }, [triggerScroll]);
 
   const stopContinuousScroll = useCallback(() => {
@@ -258,18 +258,18 @@ export const MobileVirtualCursorOverlay: React.FC = () => {
           isDraggingController ? 'scale-105 shadow-[0_14px_40px_rgba(0,0,0,0.8),0_0_26px_rgba(56,189,248,0.5)]' : ''
         }`}
       >
-        {/* 1. UP ARROW BUTTON (Scrolls forward +150) */}
+        {/* 1. UP ARROW BUTTON (Scrolls forward smoothly) */}
         <button
           type="button"
           data-cursor-ignore="true"
           onClick={(e) => {
             e.stopPropagation();
-            triggerScroll(150);
+            triggerScroll(32);
             dreamAudio.playHover();
           }}
           onPointerDown={(e) => {
             e.stopPropagation();
-            startContinuousScroll(150);
+            startContinuousScroll(20);
           }}
           onPointerUp={stopContinuousScroll}
           onPointerLeave={stopContinuousScroll}
@@ -295,18 +295,18 @@ export const MobileVirtualCursorOverlay: React.FC = () => {
           <div className="w-6 h-1 rounded-full bg-gradient-to-r from-sky-400 via-amber-300 to-sky-400 shadow-[0_0_8px_rgba(251,191,36,0.65)] group-active:scale-110 group-active:brightness-125 transition-transform" />
         </div>
 
-        {/* 3. DOWN ARROW BUTTON (Scrolls backward -150) */}
+        {/* 3. DOWN ARROW BUTTON (Scrolls backward smoothly) */}
         <button
           type="button"
           data-cursor-ignore="true"
           onClick={(e) => {
             e.stopPropagation();
-            triggerScroll(-150);
+            triggerScroll(-32);
             dreamAudio.playHover();
           }}
           onPointerDown={(e) => {
             e.stopPropagation();
-            startContinuousScroll(-150);
+            startContinuousScroll(-20);
           }}
           onPointerUp={stopContinuousScroll}
           onPointerLeave={stopContinuousScroll}

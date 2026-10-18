@@ -9,6 +9,7 @@ import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { LetsDriveButton } from '../components/LetsDriveButton';
 import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
+import { getStageDimensions } from '../context/MobileVirtualCursorContext';
 import landingBgUser from '../assets/images/landing_bg_user.jpg';
 import journeyCutsceneUrl from '../../cutscenes-1.mp4';
 
@@ -54,20 +55,19 @@ export const LandingPage: React.FC = () => {
   // Mouse move listener: continuously updates 3D parallax on pointer & virtual cursor movement
   useEffect(() => {
     const handlePointerMove = (e: MouseEvent) => {
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
       const { innerWidth, innerHeight } = window;
       if (!innerWidth || !innerHeight) return;
       const nx = (e.clientX / innerWidth - 0.5) * 2;
       const ny = (e.clientY / innerHeight - 0.5) * 2;
-      mouseX.set(nx);
-      mouseY.set(ny);
+      mouseX.set(Math.max(-1, Math.min(1, nx)));
+      mouseY.set(Math.max(-1, Math.min(1, ny)));
     };
 
     const handleVirtualMove = (e: Event) => {
       const ev = e as CustomEvent<{ x: number; y: number }>;
-      if (!ev.detail) return;
-      const container = document.getElementById('auto-landscape-container');
-      const w = container?.clientWidth || window.innerWidth || 1;
-      const h = container?.clientHeight || window.innerHeight || 1;
+      if (!ev.detail || typeof ev.detail.x !== 'number') return;
+      const { width: w, height: h } = getStageDimensions();
       const nx = (ev.detail.x / w - 0.5) * 2;
       const ny = (ev.detail.y / h - 0.5) * 2;
       mouseX.set(Math.max(-1, Math.min(1, nx)));
@@ -137,6 +137,28 @@ export const LandingPage: React.FC = () => {
   };
 
   // ── Touch & Mouse Interactive Dream Ripple (Circle outline with sound) ─────
+  const spawnRippleAt = useCallback((x: number, y: number) => {
+    if (isZooming) return;
+    const id = Date.now() + Math.random();
+    setRipples((prev) => [...prev.slice(-4), { id, x, y }]);
+    dreamAudio.playDreamRipple();
+
+    setTimeout(() => {
+      setRipples((prev) => prev.filter((r) => r.id !== id));
+    }, 950);
+  }, [isZooming]);
+
+  useEffect(() => {
+    const handleVirtualClick = (e: Event) => {
+      const ev = e as CustomEvent<{ x: number; y: number }>;
+      if (!ev.detail || isZooming) return;
+      spawnRippleAt(ev.detail.x, ev.detail.y);
+    };
+
+    window.addEventListener('virtual-cursor-click', handleVirtualClick);
+    return () => window.removeEventListener('virtual-cursor-click', handleVirtualClick);
+  }, [spawnRippleAt, isZooming]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Only accept primary left mouse click or touch events
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -171,13 +193,7 @@ export const LandingPage: React.FC = () => {
       y = Math.max(0, Math.min(stageHeight, y));
     }
 
-    const id = Date.now() + Math.random();
-    setRipples((prev) => [...prev.slice(-4), { id, x, y }]);
-    dreamAudio.playDreamRipple();
-
-    setTimeout(() => {
-      setRipples((prev) => prev.filter((r) => r.id !== id));
-    }, 950);
+    spawnRippleAt(x, y);
   };
 
   return (

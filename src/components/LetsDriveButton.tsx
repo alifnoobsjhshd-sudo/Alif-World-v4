@@ -24,19 +24,50 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [proximityFactor, setProximityFactor] = useState(0.1);
 
-  // ── Global Mouse/Cursor Tracker: Nearest side lights up at all distances ──
-  const handleGlobalPointerMove = useCallback((e: MouseEvent | PointerEvent) => {
+  // ── Global Mouse & Virtual Cursor Tracker: Nearest side lights up at all distances ──
+  const updatePointerTracker = useCallback((stageCursorX: number, stageCursorY: number) => {
     if (!containerRef.current) return;
 
+    const container = document.getElementById('auto-landscape-container');
+    const bounds = container?.getBoundingClientRect();
+    const isAutoRotated = Boolean(container?.style.transform.includes('rotate(90deg)'));
     const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
 
-    const mx = e.clientX;
-    const my = e.clientY;
+    let btnX: number;
+    let btnY: number;
+    let btnW: number;
+    let btnH: number;
 
-    // Check if cursor is directly on the button
-    const inside = mx >= rect.left && mx <= rect.right && my >= rect.top && my <= rect.bottom;
+    if (isAutoRotated && bounds && bounds.height > 0 && bounds.width > 0) {
+      // In 90deg clockwise auto-landscape:
+      // Physical Y maps to Stage X, and (bounds.right - physical X) maps to Stage Y
+      const stageWidth = container.clientWidth || bounds.height;
+      const stageHeight = container.clientHeight || bounds.width;
+      const cx_phys = rect.left + rect.width / 2;
+      const cy_phys = rect.top + rect.height / 2;
+      btnX = ((cy_phys - bounds.top) / bounds.height) * stageWidth;
+      btnY = ((bounds.right - cx_phys) / bounds.width) * stageHeight;
+      btnW = (rect.height / bounds.height) * stageWidth;
+      btnH = (rect.width / bounds.width) * stageHeight;
+    } else if (bounds) {
+      btnX = rect.left - bounds.left + rect.width / 2;
+      btnY = rect.top - bounds.top + rect.height / 2;
+      btnW = rect.width;
+      btnH = rect.height;
+    } else {
+      btnX = rect.left + rect.width / 2;
+      btnY = rect.top + rect.height / 2;
+      btnW = rect.width;
+      btnH = rect.height;
+    }
+
+    const mx = stageCursorX;
+    const my = stageCursorY;
+
+    // Check if cursor is directly on the button in stage coordinates
+    const dxFromCenter = Math.abs(mx - btnX);
+    const dyFromCenter = Math.abs(my - btnY);
+    const inside = dxFromCenter <= btnW / 2 && dyFromCenter <= btnH / 2;
 
     if (inside) {
       setIsHovered(true);
@@ -48,8 +79,8 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     setIsHovered(false);
 
     // Compute closest distance from cursor to button rectangle edge
-    const dx = Math.max(rect.left - mx, 0, mx - rect.right);
-    const dy = Math.max(rect.top - my, 0, my - rect.bottom);
+    const dx = Math.max(dxFromCenter - btnW / 2, 0);
+    const dy = Math.max(dyFromCenter - btnH / 2, 0);
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     // Continuous proximity ratio from 0 (very far) to 1 (touching edge)
@@ -57,8 +88,8 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     const prox = Math.max(0, Math.min(1, 1 - dist / maxDistanceScale));
     setProximityFactor(prox);
 
-    // Calculate angle from button center to mouse (conic 0deg is top, 90deg is right)
-    const angleRad = Math.atan2(my - cy, mx - cx);
+    // Calculate angle from button center to cursor in landscape coordinate space (conic 0deg is top, 90deg is right)
+    const angleRad = Math.atan2(my - btnY, mx - btnX);
     const angleDeg = (angleRad * 180) / Math.PI;
     const normConic = (angleDeg + 90 + 360) % 360;
     setConicAngle(normConic);
@@ -70,12 +101,44 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
     setSpread(currentSpread);
   }, []);
 
+  const handleGlobalPointerMove = useCallback((e: MouseEvent | PointerEvent) => {
+    // If mobile virtual cursor is active, skip pointermove/mousemove since virtual-cursor-move supplies exact stage coordinates
+    if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
+
+    const container = document.getElementById('auto-landscape-container');
+    const bounds = container?.getBoundingClientRect();
+    const isAutoRotated = Boolean(container?.style.transform.includes('rotate(90deg)'));
+    let stageX = e.clientX;
+    let stageY = e.clientY;
+
+    if (container && bounds && bounds.width > 0 && bounds.height > 0) {
+      const stageWidth = container.clientWidth || bounds.width;
+      const stageHeight = container.clientHeight || bounds.height;
+      if (isAutoRotated) {
+        stageX = ((e.clientY - bounds.top) / bounds.height) * stageWidth;
+        stageY = ((bounds.right - e.clientX) / bounds.width) * stageHeight;
+      } else {
+        stageX = ((e.clientX - bounds.left) / bounds.width) * stageWidth;
+        stageY = ((e.clientY - bounds.top) / bounds.height) * stageHeight;
+      }
+    }
+    updatePointerTracker(stageX, stageY);
+  }, [updatePointerTracker]);
+
   useEffect(() => {
     const handleVirtual = (e: Event) => {
       const ev = e as CustomEvent<{ x: number; y: number }>;
-      if (!ev.detail) return;
-      handleGlobalPointerMove({ clientX: ev.detail.x, clientY: ev.detail.y } as MouseEvent);
+      if (!ev.detail || typeof ev.detail.x !== 'number') return;
+      // Virtual cursor coordinates are already provided in stage coordinates!
+      updatePointerTracker(ev.detail.x, ev.detail.y);
     };
+
+    // Initialize initial cursor facing direction immediately on mount
+    const container = document.getElementById('auto-landscape-container');
+    const bounds = container?.getBoundingClientRect();
+    const initW = container?.clientWidth || bounds?.width || (typeof window !== 'undefined' ? window.innerWidth : 800);
+    const initH = container?.clientHeight || bounds?.height || (typeof window !== 'undefined' ? window.innerHeight : 600);
+    updatePointerTracker(initW / 2, initH / 2);
 
     window.addEventListener('mousemove', handleGlobalPointerMove, { passive: true });
     window.addEventListener('pointermove', handleGlobalPointerMove, { passive: true });
@@ -85,7 +148,7 @@ export const LetsDriveButton: React.FC<LetsDriveButtonProps> = ({
       window.removeEventListener('pointermove', handleGlobalPointerMove);
       window.removeEventListener('virtual-cursor-move', handleVirtual);
     };
-  }, [handleGlobalPointerMove]);
+  }, [handleGlobalPointerMove, updatePointerTracker]);
 
   // Subtle magnetic hover state (button position and size remain strictly locked)
   const handlePointerEnter = () => {

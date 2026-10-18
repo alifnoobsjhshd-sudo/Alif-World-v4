@@ -7,6 +7,7 @@ import { dreamAudio } from '../utils/audio';
 import { MagneticShimmerButton } from '../components/MagneticShimmerButton';
 import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton';
 import { CinematicVideoCutscene } from '../components/CinematicVideoCutscene';
+import { getStageDimensions } from '../context/MobileVirtualCursorContext';
 import worldCutsceneUrl from '../../cutscenes-2.mp4';
 
 // Visual assets
@@ -61,23 +62,19 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
     };
   }, []);
 
-  // ── Unified 3D Parallax Tracking via Mouse Movement ──
-  // Per user request:
-  // "make island not floating they are hardly stick with the board.
-  // So in mouse cursor movement it will move the background with all elements above the board exactly like landing page.
-  // Make sure it will little less move farther than landing page and will have little delay on moving."
+  // ── Unified 3D Parallax Tracking via Mouse Movement & Virtual Cursor ──
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // Softer stiffness & higher damping + higher mass for the requested slight delay & smooth weighted drift:
-  const springX = useSpring(mouseX, { stiffness: 42, damping: 25, mass: 0.85 });
-  const springY = useSpring(mouseY, { stiffness: 42, damping: 25, mass: 0.85 });
+  // Responsive spring physics providing crisp tactile 3D movement matching desktop ratio
+  const springX = useSpring(mouseX, { stiffness: 50, damping: 24, mass: 0.75 });
+  const springY = useSpring(mouseY, { stiffness: 50, damping: 24, mass: 0.75 });
 
-  // Move slightly less farther than landing page (Landing page is [32, -32] and [22, -22]):
-  const sceneX = useTransform(springX, [-1, 1], [22, -22]);
-  const sceneY = useTransform(springY, [-1, 1], [15, -15]);
-  const sceneRotY = useTransform(springX, [-1, 1], [-3.2, 3.2]);
-  const sceneRotX = useTransform(springY, [-1, 1], [2.8, -2.8]);
+  // 3D Tilt and Parallax Shifts (Deep desktop-grade 3D feel):
+  const sceneX = useTransform(springX, [-1, 1], [30, -30]);
+  const sceneY = useTransform(springY, [-1, 1], [20, -20]);
+  const sceneRotY = useTransform(springX, [-1, 1], [-4.8, 4.8]);
+  const sceneRotX = useTransform(springY, [-1, 1], [4.0, -4.0]);
 
   // Peaceful World Theme Background Music (Airflows and air sound effects removed per request)
   useEffect(() => {
@@ -101,19 +98,44 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
   }, [hasCutsceneEnded]);
 
   useEffect(() => {
-    const handleMove = (x: number, y: number) => {
-      const { innerWidth, innerHeight } = window;
-      if (!innerWidth || !innerHeight) return;
-      const normX = (x / innerWidth - 0.5) * 2;
-      const normY = (y / innerHeight - 0.5) * 2;
+    const handleMove = (stageX: number, stageY: number) => {
+      const { width: stageW, height: stageH } = getStageDimensions();
+      if (!stageW || !stageH) return;
+      const normX = Math.max(-1, Math.min(1, (stageX / stageW - 0.5) * 2));
+      const normY = Math.max(-1, Math.min(1, (stageY / stageH - 0.5) * 2));
       mouseX.set(normX);
       mouseY.set(normY);
+    };
 
-      // Hit-testing for island interaction glow (works for both real mouse and virtual cursor)
+    const updateIslandHover = (x: number, y: number, isVirtual: boolean) => {
+      const container = document.getElementById('auto-landscape-container');
+      const bounds = container?.getBoundingClientRect();
+      const isAutoRotated = Boolean(container?.style.transform.includes('rotate(90deg)'));
+
       const checkHit = (ref: React.RefObject<HTMLDivElement | null>) => {
         if (!ref.current) return false;
         const r = ref.current.getBoundingClientRect();
-        const pad = 18;
+        if (isVirtual && isAutoRotated && bounds && bounds.height > 0 && bounds.width > 0) {
+          const stageW = container?.clientWidth || bounds.height;
+          const stageH = container?.clientHeight || bounds.width;
+          const cx_phys = r.left + r.width / 2;
+          const cy_phys = r.top + r.height / 2;
+          const islandStageX = ((cy_phys - bounds.top) / bounds.height) * stageW;
+          const islandStageY = ((bounds.right - cx_phys) / bounds.width) * stageH;
+          const islandStageW = (r.height / bounds.height) * stageW;
+          const islandStageH = (r.width / bounds.width) * stageH;
+          const pad = 26;
+          return Math.abs(x - islandStageX) <= islandStageW / 2 + pad && Math.abs(y - islandStageY) <= islandStageH / 2 + pad;
+        }
+
+        if (isVirtual && bounds) {
+          const islandStageX = r.left - bounds.left + r.width / 2;
+          const islandStageY = r.top - bounds.top + r.height / 2;
+          const pad = 24;
+          return Math.abs(x - islandStageX) <= r.width / 2 + pad && Math.abs(y - islandStageY) <= r.height / 2 + pad;
+        }
+
+        const pad = 20;
         return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
       };
 
@@ -136,13 +158,21 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
     };
 
     const handlePointerMove = (e: MouseEvent) => {
-      handleMove(e.clientX, e.clientY);
+      if (document.body.classList.contains('mobile-virtual-cursor-active')) return;
+      const { innerWidth, innerHeight } = window;
+      if (!innerWidth || !innerHeight) return;
+      const normX = Math.max(-1, Math.min(1, (e.clientX / innerWidth - 0.5) * 2));
+      const normY = Math.max(-1, Math.min(1, (e.clientY / innerHeight - 0.5) * 2));
+      mouseX.set(normX);
+      mouseY.set(normY);
+      updateIslandHover(e.clientX, e.clientY, false);
     };
 
     const handleVirtual = (e: Event) => {
       const ev = e as CustomEvent<{ x: number; y: number }>;
       if (ev.detail && typeof ev.detail.x === 'number') {
         handleMove(ev.detail.x, ev.detail.y);
+        updateIslandHover(ev.detail.x, ev.detail.y, true);
       }
     };
 
@@ -307,16 +337,16 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
       {/* Both the board and the islands move together under mouse parallax with slight delay & scaled travel */}
       <div
         className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden z-10"
-        style={{ perspective: isDesktop ? '1100px' : 'none' }}
+        style={{ perspective: '1100px' }}
       >
         <motion.div
           style={{
-            x: isDesktop ? sceneX : 0,
-            y: isDesktop ? sceneY : 0,
-            rotateX: isDesktop ? sceneRotX : 0,
-            rotateY: isDesktop ? sceneRotY : 0,
+            x: sceneX,
+            y: sceneY,
+            rotateX: sceneRotX,
+            rotateY: sceneRotY,
             transformStyle: 'preserve-3d',
-            scale: isDesktop ? 1.09 : 1.08,
+            scale: 1.09,
           }}
           className="relative w-full h-full flex items-center justify-center will-change-transform"
         >
@@ -349,7 +379,7 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
             ref={clusterRef}
             style={{
               transformOrigin: zoomOrigin,
-              transform: 'translateZ(18px)', // Hardly stuck right on top of board with slight 3D elevation
+              transform: 'translateZ(26px)', // Firmly anchored with crisp 3D elevation above board
             }}
             animate={
               zoomingIsland

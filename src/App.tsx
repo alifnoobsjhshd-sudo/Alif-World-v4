@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import {
   motion,
   animate,
@@ -536,12 +536,22 @@ function StorylinePortfolio({ initialLoading }: { initialLoading: boolean }) {
 
 export default function App() {
   const [initialLoading, setInitialLoading] = useState(true);
+  const [isRotationNoticeActive, setIsRotationNoticeActive] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const isMobileScreen = Math.min(window.innerWidth, window.innerHeight) <= 840;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    return isMobileScreen && isPortrait;
+  });
   const { pathname } = useLocation();
+
+  const handleRotationDismiss = useCallback(() => {
+    setIsRotationNoticeActive(false);
+  }, []);
 
   return (
     <MobileVirtualCursorProvider>
       {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
-      <MobileLandscapeNotice />
+      <MobileLandscapeNotice onDismiss={handleRotationDismiss} />
 
       {/* ── AUTOMATIC LANDSCAPE CONTAINER (All pages rendered in desktop landscape ratio) ── */}
       <AutoLandscapeWrapper>
@@ -551,7 +561,7 @@ export default function App() {
         <MobileCursorModeSwitchOverlay />
         <GlobalChatButton />
         <AnimatePresence>
-          {initialLoading && pathname !== '/chat' && (
+          {!isRotationNoticeActive && initialLoading && pathname !== '/chat' && (
             <LoadingScreen onComplete={() => setInitialLoading(false)} />
           )}
         </AnimatePresence>

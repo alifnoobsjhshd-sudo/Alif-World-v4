@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Smartphone, RotateCw } from 'lucide-react';
+import { dreamAudio } from '../utils/audio';
 
 interface MobileLandscapeNoticeProps {
   onDismiss?: () => void;
@@ -9,8 +10,9 @@ interface MobileLandscapeNoticeProps {
 export const MobileLandscapeNotice: React.FC<MobileLandscapeNoticeProps> = ({ onDismiss }) => {
   const [isPortraitMobile, setIsPortraitMobile] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    const isMobileWidth = window.innerWidth <= 840 || window.innerHeight > window.innerWidth;
-    return isMobileWidth && window.innerHeight > window.innerWidth;
+    const isMobileScreen = Math.min(window.innerWidth, window.innerHeight) <= 840;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    return isMobileScreen && isPortrait;
   });
 
   const [dismissed, setDismissed] = useState<boolean>(false);
@@ -20,7 +22,12 @@ export const MobileLandscapeNotice: React.FC<MobileLandscapeNoticeProps> = ({ on
       if (typeof window === 'undefined') return;
       const isPortrait = window.innerHeight > window.innerWidth;
       const isMobileScreen = Math.min(window.innerWidth, window.innerHeight) <= 840;
-      setIsPortraitMobile(isMobileScreen && isPortrait);
+      const portrait = isMobileScreen && isPortrait;
+      setIsPortraitMobile(portrait);
+      if (!portrait && !dismissed) {
+        setDismissed(true);
+        if (onDismiss) onDismiss();
+      }
     };
 
     checkOrientation();
@@ -30,10 +37,12 @@ export const MobileLandscapeNotice: React.FC<MobileLandscapeNoticeProps> = ({ on
       window.removeEventListener('resize', checkOrientation);
       window.removeEventListener('orientationchange', checkOrientation);
     };
-  }, []);
+  }, [dismissed, onDismiss]);
 
-  const handleTap = () => {
+  const handleTap = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
     setDismissed(true);
+    dreamAudio.playPop();
     if (onDismiss) onDismiss();
   };
 

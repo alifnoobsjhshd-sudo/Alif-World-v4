@@ -328,14 +328,21 @@ export const MobileVirtualCursorProvider: React.FC<{ children: React.ReactNode }
     ) as HTMLElement | null;
     const clickTarget = interactiveTarget || target;
 
+    const container = document.getElementById('auto-landscape-container');
+    const isAutoRotated = Boolean(container?.style.transform.includes('rotate(90deg)'));
+
+    // In 90deg mobile landscape, physical client coordinates map to document.elementsFromPoint
+    const physClientX = isAutoRotated ? window.innerWidth - y : x;
+    const physClientY = isAutoRotated ? x : y;
+
     const eventInit = {
       bubbles: true,
       cancelable: true,
       view: window,
-      clientX: x,
-      clientY: y,
-      screenX: x,
-      screenY: y,
+      clientX: isAutoRotated ? physClientX : x,
+      clientY: isAutoRotated ? physClientY : y,
+      screenX: isAutoRotated ? physClientX : x,
+      screenY: isAutoRotated ? physClientY : y,
       button: 0,
       buttons: 1,
     };
