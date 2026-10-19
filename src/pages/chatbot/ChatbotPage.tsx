@@ -33,7 +33,23 @@ export default function ChatbotPage() {
   const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'end' });
+    window.scrollTo(0, 0);
+    if (screen.orientation && 'unlock' in screen.orientation) {
+      try {
+        (screen.orientation as any).unlock();
+      } catch (_) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 1 || isLoading || error) {
+      if (feedRef.current) {
+        feedRef.current.scrollTo({
+          top: feedRef.current.scrollHeight,
+          behavior: reduceMotion ? 'auto' : 'smooth',
+        });
+      }
+    }
   }, [messages, isLoading, error, reduceMotion]);
 
   useEffect(
@@ -194,7 +210,6 @@ export default function ChatbotPage() {
   return (
     <main className="alif-chat" aria-label="Chat with Alif's virtual assistant">
       <style>{`
-        .alif-chat {
         :root {
           --chat-ink: #17223b;
           --chat-muted: #63708a;
@@ -633,120 +648,202 @@ export default function ChatbotPage() {
         .alif-chat__confirm-button:hover { filter: brightness(.97); }
         .alif-chat :focus-visible { outline-offset: 3px; }
 
-        /* ── MOBILE SCREEN RATIO (Portrait & Narrow Screens <= 768px) ── */
-        @media (max-width: 768px) {
+        /* ── MOBILE SCREEN RATIO (Portrait & Narrow Screens <= 860px) ── */
+        @media (max-width: 860px) {
           .alif-chat {
-            align-items: stretch;
-            padding: 0;
-            height: 100dvh;
-            max-height: 100dvh;
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            background: #202c50 !important;
           }
-          .alif-chat__backdrop { background-position: 54% center; }
+          .alif-chat__backdrop,
+          .alif-chat__stars {
+            display: none !important;
+          }
           .alif-chat__frame {
-            width: 100%;
-            height: 100%;
-            max-height: 100%;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-            border: 0;
-            border-radius: 0;
-            box-shadow: none;
+            position: relative !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            min-height: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #fafaf6 !important;
+            overflow: hidden !important;
+            flex: 1 1 100% !important;
           }
           .alif-chat__side {
-            display: none;
+            display: none !important;
           }
           .alif-chat__main {
-            flex: 1 1 auto;
-            height: 100%;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
+            position: relative !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            min-height: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 100% !important;
+            overflow: hidden !important;
+            background: #fafaf6 !important;
           }
           .alif-chat__header {
-            min-height: 56px;
-            padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+            flex: 0 0 auto !important;
+            min-height: 50px !important;
+            padding: max(8px, env(safe-area-inset-top)) 12px 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            background: rgba(255, 255, 252, 0.96) !important;
+            border-bottom: 1px solid #e5e7df !important;
+            backdrop-filter: blur(8px) !important;
+            z-index: 10 !important;
           }
           .alif-chat__heading {
-            gap: 10px;
+            gap: 8px !important;
+            min-width: 0 !important;
           }
           .alif-chat__avatar {
-            width: 35px;
-            height: 35px;
-            border-radius: 11px;
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 10px !important;
+            flex-shrink: 0 !important;
+          }
+          .alif-chat__avatar svg {
+            width: 16px !important;
+            height: 16px !important;
           }
           .alif-chat__heading h2 {
-            font-size: 13.5px;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
           }
           .alif-chat__presence {
-            font-size: 10px;
-            margin: 2px 0 0;
+            font-size: 9.5px !important;
+            margin: 1px 0 0 !important;
           }
           .alif-chat__header-actions {
-            gap: 6px;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            flex-shrink: 0 !important;
           }
           .alif-chat__icon-button {
-            min-width: 32px;
-            min-height: 32px;
-            padding: 0 8px;
-            font-size: 11px;
-            border-radius: 9px;
-            border: 1px solid #e2e4dd;
-            background: #fffefa;
+            min-width: 32px !important;
+            min-height: 32px !important;
+            padding: 0 9px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            border-radius: 9px !important;
+            border: 1px solid #dfe2dc !important;
+            background: #ffffff !important;
           }
           .alif-chat__feed {
-            flex: 1 1 0;
-            min-height: 0;
-            gap: 14px;
-            padding: 14px 12px 10px;
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overscroll-behavior: contain !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding: 12px 12px 8px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .alif-chat__message-row {
+            gap: 8px !important;
           }
           .alif-chat__bubble {
-            max-width: 90%;
-            padding: 11px 14px;
-            font-size: 13px;
-            line-height: 1.6;
+            max-width: 90% !important;
+            padding: 11px 13px !important;
+            font-size: 13.5px !important;
+            line-height: 1.6 !important;
+            border-radius: 16px !important;
           }
           .alif-chat__suggestions {
-            margin-left: 0;
-            gap: 6px;
+            margin: 0 !important;
+            gap: 6px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
           }
           .alif-chat__suggestion {
-            font-size: 10.5px;
-            padding: 7px 11px;
+            font-size: 12px !important;
+            padding: 9px 12px !important;
+            border-radius: 12px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            line-height: 1.4 !important;
+            text-align: left !important;
+            border: 1px solid #dbe0e6 !important;
+            background: #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
           }
           .alif-chat__error {
-            margin-left: 0;
-            padding: 8px 10px;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+            font-size: 11px !important;
           }
           .alif-chat__composer-wrap {
-            flex: 0 0 auto;
-            padding: 8px 12px max(10px, env(safe-area-inset-bottom));
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            padding: 8px 12px max(10px, env(safe-area-inset-bottom)) !important;
+            background: rgba(250, 250, 246, 0.98) !important;
+            border-top: 1px solid rgba(228, 230, 222, 0.85) !important;
           }
           .alif-chat__composer {
-            padding: 6px 6px 6px 12px;
-            border-radius: 16px;
-            gap: 8px;
+            display: flex !important;
+            align-items: flex-end !important;
+            gap: 8px !important;
+            padding: 5px 6px 5px 12px !important;
+            border-radius: 18px !important;
+            border: 1.5px solid #d4d9de !important;
+            background: #ffffff !important;
+            box-shadow: 0 2px 8px rgba(34, 46, 71, 0.05) !important;
           }
           .alif-chat__textarea {
-            font-size: 15px;
-            line-height: 1.5;
-            max-height: 75px;
+            font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+            line-height: 1.45 !important;
+            max-height: 80px !important;
+            min-height: 38px !important;
+            padding: 6px 0 !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
           }
           .alif-chat__send {
-            width: 38px;
-            height: 38px;
+            width: 38px !important;
+            height: 38px !important;
+            flex: 0 0 38px !important;
+            border-radius: 12px !important;
           }
           .alif-chat__footnote {
-            font-size: 8px;
-            margin: 5px 2px 0;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            margin: 4px 2px 0 !important;
+            font-size: 8.5px !important;
           }
           .alif-chat__footnote span:first-child {
-            display: none;
+            display: none !important;
           }
         }
 
         /* ── COMPACT HEIGHT SCREENS (Landscape mobile or short windows) ── */
-        @media (max-height: 600px) and (min-width: 769px) {
+        @media (max-height: 600px) and (min-width: 861px) {
           .alif-chat {
             padding: 0;
             height: 100dvh;
@@ -805,6 +902,7 @@ export default function ChatbotPage() {
             animation-duration: .01ms !important;
             animation-iteration-count: 1 !important;
             transition-duration: .01ms !important;
+          }
         }
       `}</style>
 
@@ -856,7 +954,6 @@ export default function ChatbotPage() {
           </header>
 
           <div className="alif-chat__feed" ref={feedRef} role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation">
-            <p className="alif-chat__date-mark">Your conversation starts here</p>
             {messages.map((message, index) => {
               if (message.role === 'assistant' && !message.content) return null;
               return (

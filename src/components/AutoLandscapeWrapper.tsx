@@ -7,7 +7,7 @@ interface AutoLandscapeWrapperProps {
 
 export const AutoLandscapeWrapper: React.FC<AutoLandscapeWrapperProps> = ({ children }) => {
   const { pathname } = useLocation();
-  const isChat = pathname === '/chat';
+  const isChat = pathname === '/chat' || pathname.startsWith('/chat/');
 
   const [dims, setDims] = useState(() => {
     if (typeof window === 'undefined') return { width: 1024, height: 768, isPortraitMobile: false };
@@ -59,7 +59,7 @@ export const AutoLandscapeWrapper: React.FC<AutoLandscapeWrapperProps> = ({ chil
   // without forced 90deg rotation or touch/select blocking so typing and prompt bar work seamlessly
   if (isChat) {
     return (
-      <div id="auto-landscape-container" className="w-full h-full min-h-dvh relative overflow-hidden">
+      <div id="auto-landscape-container" className="w-full h-full relative overflow-hidden select-text">
         {children}
       </div>
     );

@@ -543,43 +543,16 @@ export default function App() {
     return isMobileScreen && isPortrait;
   });
   const { pathname } = useLocation();
+  const isChat = pathname === '/chat' || pathname.startsWith('/chat/');
 
   const handleRotationDismiss = useCallback(() => {
     setIsRotationNoticeActive(false);
   }, []);
 
-  return (
-    <MobileVirtualCursorProvider>
-      {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
-      {pathname !== '/chat' && (
-        <MobileLandscapeNotice onDismiss={handleRotationDismiss} />
-      )}
-
-      {/* ── AUTOMATIC LANDSCAPE CONTAINER (All pages rendered in desktop landscape ratio) ── */}
-      <AutoLandscapeWrapper>
-        {pathname !== '/chat' && <CustomCursor />}
-        {pathname !== '/chat' && <VirtualCursorPad />}
-        {pathname !== '/chat' && <MobileVirtualCursorOverlay />}
-        {pathname !== '/chat' && <MobileCursorModeSwitchOverlay />}
-        {pathname !== '/chat' && <GlobalChatButton />}
-        <AnimatePresence>
-          {!isRotationNoticeActive && initialLoading && pathname !== '/chat' && (
-            <LoadingScreen onComplete={() => setInitialLoading(false)} />
-          )}
-        </AnimatePresence>
-        <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/world" element={<WorldPage initialLoading={initialLoading} />} />
-        <Route path="/journey" element={<StorylinePortfolio initialLoading={initialLoading} />} />
-        <Route path="/story" element={<StorylinePortfolio initialLoading={initialLoading} />} />
-        <Route path="/projects" element={<ProjectsPage initialLoading={initialLoading} />} />
-        <Route path="/explore-works" element={<ExploreWorksPage />} />
-        <Route path="/explore-work" element={<ExploreWorksPage />} />
-        <Route path="/about" element={<AboutMePage />} />
-        <Route path="/about-me" element={<AboutMePage />} />
-        <Route path="/more-about-him" element={<AboutMePage />} />
-        <Route path="/not-available" element={<NotAvailablePage />} />
-        <Route path="/unavailable" element={<NotAvailablePage />} />
+  // When visiting /chat, render directly without AutoLandscapeWrapper or desktop rotation
+  if (isChat) {
+    return (
+      <Routes>
         <Route
           path="/chat"
           element={(
@@ -598,7 +571,41 @@ export default function App() {
           )}
         />
       </Routes>
-    </AutoLandscapeWrapper>
+    );
+  }
+
+  return (
+    <MobileVirtualCursorProvider>
+      {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
+      <MobileLandscapeNotice onDismiss={handleRotationDismiss} />
+
+      {/* ── AUTOMATIC LANDSCAPE CONTAINER (All pages rendered in desktop landscape ratio) ── */}
+      <AutoLandscapeWrapper>
+        <CustomCursor />
+        <VirtualCursorPad />
+        <MobileVirtualCursorOverlay />
+        <MobileCursorModeSwitchOverlay />
+        <GlobalChatButton />
+        <AnimatePresence>
+          {!isRotationNoticeActive && initialLoading && (
+            <LoadingScreen onComplete={() => setInitialLoading(false)} />
+          )}
+        </AnimatePresence>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/world" element={<WorldPage initialLoading={initialLoading} />} />
+          <Route path="/journey" element={<StorylinePortfolio initialLoading={initialLoading} />} />
+          <Route path="/story" element={<StorylinePortfolio initialLoading={initialLoading} />} />
+          <Route path="/projects" element={<ProjectsPage initialLoading={initialLoading} />} />
+          <Route path="/explore-works" element={<ExploreWorksPage />} />
+          <Route path="/explore-work" element={<ExploreWorksPage />} />
+          <Route path="/about" element={<AboutMePage />} />
+          <Route path="/about-me" element={<AboutMePage />} />
+          <Route path="/more-about-him" element={<AboutMePage />} />
+          <Route path="/not-available" element={<NotAvailablePage />} />
+          <Route path="/unavailable" element={<NotAvailablePage />} />
+        </Routes>
+      </AutoLandscapeWrapper>
     </MobileVirtualCursorProvider>
   );
 }
