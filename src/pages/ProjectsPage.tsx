@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Volume2, VolumeX } from 'lucide-react';
@@ -9,6 +9,15 @@ import { MobileCursorToggleButton } from '../components/MobileCursorToggleButton
 export const ProjectsPage = React.memo(({ initialLoading }: { initialLoading: boolean }) => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
+
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
   const [activeCategory, setActiveCategory] = React.useState('All');
   const [isPreloading, setIsPreloading] = React.useState(true);
   const [preloadingProgress, setPreloadingProgress] = React.useState(0);

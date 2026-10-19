@@ -56,6 +56,16 @@ const TIMELINE_NODES: Array<{ id: string; label: string; depth: number; icon?: s
 export const AboutMePage: React.FC = () => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
+
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
+
   const [isContactOpen, setIsContactOpen] = useState(false);
 
   // ── Physics-Driven Depth Value & Velocity ─────────────────────────────────

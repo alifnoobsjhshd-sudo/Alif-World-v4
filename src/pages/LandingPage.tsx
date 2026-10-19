@@ -21,8 +21,18 @@ export const LandingPage: React.FC = () => {
   const [desktopBgSrc, setDesktopBgSrc] = useState(landingBgUser || BG_IMAGE_DESKTOP_LOCAL);
   const [isZooming, setIsZooming] = useState(false);
   const [isCutsceneActive, setIsCutsceneActive] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const [isHoveringStory, setIsHoveringStory] = useState(false);
+
+  // Sync mute state across components and storage
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
 
   // Interactive Touch & Mouse Ripple State (Circle outline effect)
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);

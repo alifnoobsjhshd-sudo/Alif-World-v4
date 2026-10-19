@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
+import { Volume2, VolumeX, SkipForward } from 'lucide-react';
+import { dreamAudio } from '../utils/audio';
 
 interface CinematicVideoCutsceneProps {
   isActive: boolean;
@@ -13,6 +15,7 @@ type PlaybackIssue = 'blocked' | 'stalled' | 'error';
 const STARTUP_TIMEOUT_MS = 12_000;
 const STALL_TIMEOUT_MS = 8_000;
 const PLAYBACK_FAILSAFE_MS = 30_000;
+const CUTSCENE_BALANCED_VOLUME = 0.30;
 
 export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   isActive,
@@ -26,10 +29,30 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
   const activeRef = useRef(isActive);
   const timersRef = useRef<{ startup?: number; stall?: number; failsafe?: number }>({});
   const [playbackIssue, setPlaybackIssue] = useState<PlaybackIssue | null>(null);
+  const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
   const prefersReducedMotion = useReducedMotion();
 
   onCompleteRef.current = onComplete;
   activeRef.current = isActive;
+
+  const syncVideoAudio = useCallback((muted: boolean) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = muted;
+    video.volume = muted ? 0.0 : CUTSCENE_BALANCED_VOLUME;
+  }, []);
+
+  // Listen to global mute changes
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      const muted = detail !== undefined ? detail.isMuted : dreamAudio.isMuted;
+      setIsMuted(muted);
+      syncVideoAudio(muted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, [syncVideoAudio]);
 
   const clearPlaybackTimers = useCallback(() => {
     const { startup, stall, failsafe } = timersRef.current;
@@ -63,7 +86,12 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     if (!video) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    video.muted = false;
+
+    // Synchronize audio with global mute state and balanced volume
+    const currentMuted = dreamAudio.isMuted;
+    setIsMuted(currentMuted);
+    video.muted = currentMuted;
+    video.volume = currentMuted ? 0.0 : CUTSCENE_BALANCED_VOLUME;
     video.preload = 'auto';
 
     const scheduleFailsafe = (delay: number) => {
@@ -105,7 +133,9 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
 
     const startVideoPlayback = async () => {
       if (!activeRef.current || completedRef.current) return;
-      video.muted = false;
+      const mutedNow = dreamAudio.isMuted;
+      video.muted = mutedNow;
+      video.volume = mutedNow ? 0.0 : CUTSCENE_BALANCED_VOLUME;
       try {
         await video.play();
       } catch {
@@ -145,6 +175,12 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     };
   }, [clearPlaybackTimers, complete, isActive, videoSrc]);
 
+  const toggleMute = () => {
+    const next = dreamAudio.toggleMute();
+    setIsMuted(next);
+    syncVideoAudio(next);
+  };
+
   const retryPlayback = async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -152,7 +188,9 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
     setPlaybackIssue(null);
     try {
       if (video.error) video.load();
-      video.muted = false;
+      const currentMuted = dreamAudio.isMuted;
+      video.muted = currentMuted;
+      video.volume = currentMuted ? 0.0 : CUTSCENE_BALANCED_VOLUME;
       await video.play();
     } catch {
       setPlaybackIssue('blocked');
@@ -177,8 +215,8 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
       aria-hidden={!isActive}
       aria-label={isActive ? "Alif's portfolio film" : undefined}
       style={{
-          height: isActive ? '100%' : '1px',
-          width: isActive ? '100%' : '1px',
+        height: isActive ? '100%' : '1px',
+        width: isActive ? '100%' : '1px',
       }}
     >
       <video
@@ -192,11 +230,54 @@ export const CinematicVideoCutscene: React.FC<CinematicVideoCutsceneProps> = ({
         onEnded={complete}
         className={
           isActive
-            ? 'cinematic-cutscene-video absolute inset-0 h-full w-full bg-black'
+            ? 'cinematic-cutscene-video absolute inset-0 h-full w-full bg-black object-cover'
             : 'absolute inset-0 h-px w-px object-cover'
         }
         aria-label="Portfolio introduction film"
       />
+
+      {/* ── Active Cutscene Top Control Overlay: Mute Toggle & Skip ── */}
+      {isActive && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.3 }}
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-2.5 pointer-events-auto"
+        >
+          {/* Quick Mute/Unmute toggle directly on cutscene */}
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white/90 hover:text-white hover:bg-black/80 hover:border-white/40 transition-all font-mono text-xs uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            title={isMuted ? 'Unmute cutscene audio' : 'Mute cutscene audio'}
+            aria-label={isMuted ? 'Unmute cutscene audio' : 'Mute cutscene audio'}
+          >
+            {isMuted ? (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-[11px] text-rose-300 hidden xs:inline">Muted</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] text-emerald-300 hidden xs:inline">Sound On</span>
+              </>
+            )}
+          </button>
+
+          {/* Quick Skip button */}
+          <button
+            type="button"
+            onClick={complete}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/30 text-white hover:bg-white hover:text-black hover:border-white transition-all font-mono text-xs uppercase tracking-wider focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            title="Skip film"
+            aria-label="Skip film"
+          >
+            <span className="text-[11px]">Skip</span>
+            <SkipForward className="w-3 h-3" />
+          </button>
+        </motion.div>
+      )}
 
       {isActive && playbackIssue && (
         <div

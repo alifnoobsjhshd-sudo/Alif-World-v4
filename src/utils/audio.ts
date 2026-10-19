@@ -370,9 +370,21 @@ const SKY_MELODIES = [
 class SkyAudioPlayer {
   private ctx: AudioContext | null = null;
   public isMuted: boolean = false;
+  public static readonly BALANCED_AMBIENT_VOLUME = 0.22;
   private lastHoverTime: number = 0;
   private lastSceneTickTime: number = 0;
   private noiseBufferCache: AudioBuffer | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('alif_audio_muted');
+        if (stored !== null) {
+          this.isMuted = stored === 'true';
+        }
+      } catch {}
+    }
+  }
 
   // ── SLEEPING SOUND & NAPPING THEME ENGINE (LANDING PAGE) ─────────────────
   private isSleepingSoundRunning: boolean = false;
@@ -480,7 +492,7 @@ class SkyAudioPlayer {
       if (this.sleepingMasterGain) {
         const now = this.ctx.currentTime;
         this.sleepingMasterGain.gain.cancelScheduledValues(now);
-        this.sleepingMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.72, now + 1.0);
+        this.sleepingMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 1.0);
       }
       return;
     }
@@ -490,10 +502,10 @@ class SkyAudioPlayer {
     this.sleepMusicStartTime = now;
     this.lastScheduledNapBeat = -1;
 
-    // Master sleeping sound bus (increased volume for landing page)
+    // Master sleeping sound bus (balanced, natural ambient volume)
     this.sleepingMasterGain = this.ctx.createGain();
     this.sleepingMasterGain.gain.setValueAtTime(0.001, now);
-    const targetVolume = this.isMuted ? 0.0 : 0.72;
+    const targetVolume = this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME;
     this.sleepingMasterGain.gain.linearRampToValueAtTime(targetVolume, now + 2.0);
     this.sleepingMasterGain.connect(this.ctx.destination);
 
@@ -887,7 +899,7 @@ class SkyAudioPlayer {
       if (this.bgmMasterGain && !this.isMuted) {
         const now = this.ctx.currentTime;
         this.bgmMasterGain.gain.cancelScheduledValues(now);
-        this.bgmMasterGain.gain.linearRampToValueAtTime(0.40, now + 1.5);
+        this.bgmMasterGain.gain.linearRampToValueAtTime(SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 1.5);
       }
       return;
     }
@@ -897,10 +909,10 @@ class SkyAudioPlayer {
     this.musicStartTime = now;
     this.lastScheduledBeat = -1;
 
-    // 1. Create BGM Master Bus
+    // 1. Create BGM Master Bus (balanced comfortable volume)
     this.bgmMasterGain = this.ctx.createGain();
     this.bgmMasterGain.gain.setValueAtTime(0.001, now);
-    const targetVolume = this.isMuted ? 0.0 : 0.40;
+    const targetVolume = this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME;
     this.bgmMasterGain.gain.linearRampToValueAtTime(targetVolume, now + 2.5);
     this.bgmMasterGain.connect(this.ctx.destination);
 
@@ -1427,8 +1439,8 @@ class SkyAudioPlayer {
 
       const lowGain = this.ctx.createGain();
       lowGain.gain.setValueAtTime(0.001, now);
-      lowGain.gain.linearRampToValueAtTime(0.12, now + 1.8);
-      lowGain.gain.linearRampToValueAtTime(0.08, now + 3.2);
+      lowGain.gain.linearRampToValueAtTime(0.065, now + 1.8);
+      lowGain.gain.linearRampToValueAtTime(0.045, now + 3.2);
       lowGain.gain.linearRampToValueAtTime(0.001, now + duration);
 
       lowNoise.connect(lowFilter);
@@ -1447,7 +1459,7 @@ class SkyAudioPlayer {
 
       const midGain = this.ctx.createGain();
       midGain.gain.setValueAtTime(0.001, now);
-      midGain.gain.linearRampToValueAtTime(0.14, now + 2.4);
+      midGain.gain.linearRampToValueAtTime(0.075, now + 2.4);
       midGain.gain.linearRampToValueAtTime(0.001, now + duration);
 
       midNoise.connect(midFilter);
@@ -1467,7 +1479,7 @@ class SkyAudioPlayer {
       const highGain = this.ctx.createGain();
       highGain.gain.setValueAtTime(0.001, now);
       highGain.gain.setValueAtTime(0.001, now + 0.8);
-      highGain.gain.linearRampToValueAtTime(0.09, now + 2.6);
+      highGain.gain.linearRampToValueAtTime(0.045, now + 2.6);
       highGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
       highNoise.connect(highFilter);
@@ -1622,7 +1634,7 @@ class SkyAudioPlayer {
 
       const gain = this.ctx.createGain();
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.08, now + 0.5);
+      gain.gain.linearRampToValueAtTime(0.045, now + 0.5);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
 
       noise.connect(filter);
@@ -1652,42 +1664,68 @@ class SkyAudioPlayer {
   private rocketOsc2: OscillatorNode | null = null;
   private rocketSubOsc: OscillatorNode | null = null;
 
-  // Toggle Mute
-  public toggleMute(): boolean {
-    this.isMuted = !this.isMuted;
+  // Set Mute explicitly
+  public setMuted(muted: boolean): boolean {
+    this.isMuted = muted;
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('alif_audio_muted', this.isMuted ? 'true' : 'false');
+        window.dispatchEvent(new CustomEvent('alif-audio-mute-change', { detail: { isMuted: this.isMuted } }));
+      }
+    } catch {}
+
     if (this.isMuted) {
       this.stopBubbleSounds(0);
+      if (this.isRocketSpeedSoundRunning) {
+        this.stopRocketSpeedSound();
+      }
     }
+
+    const ambientVol = SkyAudioPlayer.BALANCED_AMBIENT_VOLUME;
+
     if (this.underwaterAudioElement) {
-      this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.55;
+      this.underwaterAudioElement.volume = this.isMuted ? 0.0 : ambientVol;
       if (this.isMuted) {
         this.underwaterAudioElement.pause();
       } else {
         this.underwaterAudioElement.play().catch(() => {});
       }
     }
+
     if (this.ctx) {
       const now = this.ctx.currentTime;
       if (this.bgmMasterGain) {
         this.bgmMasterGain.gain.cancelScheduledValues(now);
         this.bgmMasterGain.gain.setValueAtTime(this.bgmMasterGain.gain.value, now);
-        this.bgmMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.40, now + 0.3);
+        this.bgmMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : ambientVol, now + 0.3);
       }
       if (this.sleepingMasterGain) {
         this.sleepingMasterGain.gain.cancelScheduledValues(now);
         this.sleepingMasterGain.gain.setValueAtTime(this.sleepingMasterGain.gain.value, now);
-        this.sleepingMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.72, now + 0.3);
+        this.sleepingMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : ambientVol, now + 0.3);
       }
       if (this.spaceMasterGain) {
         this.spaceMasterGain.gain.cancelScheduledValues(now);
         this.spaceMasterGain.gain.setValueAtTime(this.spaceMasterGain.gain.value, now);
-        this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.55, now + 0.3);
+        this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : ambientVol, now + 0.3);
       }
-      if (this.isMuted && this.isRocketSpeedSoundRunning) {
-        this.stopRocketSpeedSound();
+      if (this.worldSkyGain) {
+        this.worldSkyGain.gain.cancelScheduledValues(now);
+        this.worldSkyGain.gain.setValueAtTime(this.worldSkyGain.gain.value, now);
+        this.worldSkyGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : ambientVol, now + 0.3);
+      }
+      if (this.underwaterGain) {
+        this.underwaterGain.gain.cancelScheduledValues(now);
+        this.underwaterGain.gain.setValueAtTime(this.underwaterGain.gain.value, now);
+        this.underwaterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.20, now + 0.3);
       }
     }
     return this.isMuted;
+  }
+
+  // Toggle Mute
+  public toggleMute(): boolean {
+    return this.setMuted(!this.isMuted);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1715,8 +1753,8 @@ class SkyAudioPlayer {
       rumbleFilter.frequency.linearRampToValueAtTime(450, now + 2.8);
 
       rumbleGain.gain.setValueAtTime(0.001, now);
-      rumbleGain.gain.linearRampToValueAtTime(0.35, now + 0.8);
-      rumbleGain.gain.linearRampToValueAtTime(0.40, now + 2.8);
+      rumbleGain.gain.linearRampToValueAtTime(0.16, now + 0.8);
+      rumbleGain.gain.linearRampToValueAtTime(0.18, now + 2.8);
       rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 4.5);
 
       rumbleOsc.connect(rumbleFilter);
@@ -1739,7 +1777,7 @@ class SkyAudioPlayer {
 
       const roarGain = this.ctx.createGain();
       roarGain.gain.setValueAtTime(0.001, now);
-      roarGain.gain.linearRampToValueAtTime(0.42, now + 1.2);
+      roarGain.gain.linearRampToValueAtTime(0.16, now + 1.2);
       roarGain.gain.exponentialRampToValueAtTime(0.001, now + 4.8);
 
       roarSource.connect(roarFilter);
@@ -1756,7 +1794,7 @@ class SkyAudioPlayer {
       boomOsc.frequency.setValueAtTime(120, boomTime);
       boomOsc.frequency.exponentialRampToValueAtTime(30, boomTime + 0.6);
 
-      boomGain.gain.setValueAtTime(0.45, boomTime);
+      boomGain.gain.setValueAtTime(0.18, boomTime);
       boomGain.gain.exponentialRampToValueAtTime(0.001, boomTime + 1.2);
 
       boomOsc.connect(boomGain);
@@ -1855,7 +1893,7 @@ class SkyAudioPlayer {
       if (this.spaceMasterGain) {
         const now = this.ctx.currentTime;
         this.spaceMasterGain.gain.cancelScheduledValues(now);
-        this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.55, now + 1.0);
+        this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 1.0);
       }
       return;
     }
@@ -1865,7 +1903,7 @@ class SkyAudioPlayer {
       const now = this.ctx.currentTime;
       this.spaceMasterGain = this.ctx.createGain();
       this.spaceMasterGain.gain.setValueAtTime(0.001, now);
-      this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.55, now + 2.0);
+      this.spaceMasterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 2.0);
       this.spaceMasterGain.connect(this.ctx.destination);
 
       // 1. Deep Cosmic Drone (D Minor / Void Resonance: 55Hz, 73.4Hz, 110Hz, 146.8Hz, 220Hz)
@@ -2463,7 +2501,7 @@ class SkyAudioPlayer {
           this.underwaterAudioElement.loop = true;
           this.underwaterAudioElement.preload = 'auto';
         }
-        this.underwaterAudioElement.volume = this.isMuted ? 0.0 : 0.55;
+        this.underwaterAudioElement.volume = this.isMuted ? 0.0 : SkyAudioPlayer.BALANCED_AMBIENT_VOLUME;
         if (!this.isMuted) {
           this.underwaterAudioElement.play().catch(() => {});
         }
@@ -2480,7 +2518,7 @@ class SkyAudioPlayer {
       const now = this.ctx.currentTime;
       this.underwaterGain = this.ctx.createGain();
       this.underwaterGain.gain.setValueAtTime(0.001, now);
-      this.underwaterGain.gain.linearRampToValueAtTime(0.12, now + 2.0);
+      this.underwaterGain.gain.linearRampToValueAtTime(this.isMuted ? 0.0 : 0.20, now + 2.0);
 
       // 1. Deep Oceanic Sub-Bass Trench Drone (42Hz - 75Hz)
       this.underwaterOsc = this.ctx.createOscillator();
@@ -2727,22 +2765,24 @@ class SkyAudioPlayer {
     if (!this.ctx) return;
 
     try {
-      if (this.worldSkyGain) return; // already active
+      if (this.worldSkyGain) {
+        if (!this.isMuted) {
+          const now = this.ctx.currentTime;
+          this.worldSkyGain.gain.cancelScheduledValues(now);
+          this.worldSkyGain.gain.linearRampToValueAtTime(SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 1.0);
+        }
+        return;
+      }
 
       const now = this.ctx.currentTime;
       this.worldSkyGain = this.ctx.createGain();
       this.worldSkyGain.gain.setValueAtTime(0.001, now);
-      this.worldSkyGain.gain.linearRampToValueAtTime(0.09, now + 1.8);
+      this.worldSkyGain.gain.linearRampToValueAtTime(SkyAudioPlayer.BALANCED_AMBIENT_VOLUME, now + 1.8);
 
-      // Sky wind noise stream removed per user request for peaceful world atmosphere
+      // Ethereal Celestial Sky Pad (Dmaj9 - Gmaj7 open harmony)
       this.worldSkyPadGain = this.ctx.createGain();
       this.worldSkyPadGain.gain.setValueAtTime(0.001, now);
-      this.worldSkyPadGain.gain.linearRampToValueAtTime(0.065, now + 2.0);
-
-      // 2. Ethereal Celestial Sky Pad (Dmaj9 - Gmaj7 open harmony)
-      this.worldSkyPadGain = this.ctx.createGain();
-      this.worldSkyPadGain.gain.setValueAtTime(0.001, now);
-      this.worldSkyPadGain.gain.linearRampToValueAtTime(0.065, now + 2.0);
+      this.worldSkyPadGain.gain.linearRampToValueAtTime(0.20, now + 2.0);
 
       const skyPadFilter = this.ctx.createBiquadFilter();
       skyPadFilter.type = 'lowpass';
@@ -3174,7 +3214,7 @@ class SkyAudioPlayer {
 
       const gain = this.ctx.createGain();
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.14, now + duration * 0.5);
+      gain.gain.linearRampToValueAtTime(0.08, now + duration * 0.5);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
       noise.connect(filter);

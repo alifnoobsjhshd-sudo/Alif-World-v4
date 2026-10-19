@@ -20,6 +20,8 @@ export const GlobalChatButton: React.FC = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const routePath = pathname.replace(/\/+$/, '') || '/';
+  if (routePath === '/chat') return null;
+
   const isLanding = routePath === '/';
   const needsGlobalBack = !isLanding && !ROUTES_WITH_PAGE_BACK.has(routePath);
 

@@ -36,6 +36,16 @@ export const WorldPage: React.FC<{ initialLoading?: boolean }> = ({ initialLoadi
   const [activeTransition, setActiveTransition] = useState<'story' | 'about' | 'works' | null>(null);
   const [zoomOrigin, setZoomOrigin] = useState<string>('50% 50%');
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
+
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
+
   const [hoveredIsland, setHoveredIsland] = useState<'story' | 'about' | 'works' | null>(null);
   const checkDesktop = () => {
     if (typeof window === 'undefined') return false;

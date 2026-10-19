@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, animate, MotionValue } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { STORY_SCENES, SCENE_STEP } from '../data/storyline';
@@ -41,6 +41,15 @@ const TinyPlane = () => (
 export const SectionPlane = React.memo(({ activeSection, depthValue, fromLetsDrive = false }: SectionPlaneProps) => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
+
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
 
   const toggleSoundtrack = () => {
     const next = dreamAudio.toggleMute();

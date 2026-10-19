@@ -46,6 +46,16 @@ interface SpaceRipple {
 export const ExploreWorksPage: React.FC = () => {
   const navigate = useNavigate();
   const [isMuted, setIsMuted] = useState(dreamAudio.isMuted);
+
+  useEffect(() => {
+    const handleMuteChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ isMuted: boolean }>).detail;
+      setIsMuted(detail !== undefined ? detail.isMuted : dreamAudio.isMuted);
+    };
+    window.addEventListener('alif-audio-mute-change', handleMuteChange);
+    return () => window.removeEventListener('alif-audio-mute-change', handleMuteChange);
+  }, []);
+
   const [ripples, setRipples] = useState<SpaceRipple[]>([]);
   const [isSpeedEffectActive, setIsSpeedEffectActive] = useState(false);
   const [speedDirection, setSpeedDirection] = useState<'forward' | 'backward'>('forward');

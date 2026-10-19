@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 interface AutoLandscapeWrapperProps {
   children: React.ReactNode;
 }
 
 export const AutoLandscapeWrapper: React.FC<AutoLandscapeWrapperProps> = ({ children }) => {
+  const { pathname } = useLocation();
+  const isChat = pathname === '/chat';
+
   const [dims, setDims] = useState(() => {
     if (typeof window === 'undefined') return { width: 1024, height: 768, isPortraitMobile: false };
     const w = window.innerWidth;
@@ -33,8 +37,8 @@ export const AutoLandscapeWrapper: React.FC<AutoLandscapeWrapperProps> = ({ chil
         isPortraitMobile: isMobile && isPortrait,
       });
 
-      // Attempt standard browser orientation lock to landscape if available
-      if (screen.orientation && 'lock' in screen.orientation) {
+      // Attempt standard browser orientation lock to landscape if available (skip on /chat)
+      if (!isChat && screen.orientation && 'lock' in screen.orientation) {
         try {
           (screen.orientation as any).lock('landscape').catch(() => {});
         } catch (_) {}
@@ -49,7 +53,17 @@ export const AutoLandscapeWrapper: React.FC<AutoLandscapeWrapperProps> = ({ chil
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
     };
-  }, []);
+  }, [isChat]);
+
+  // When on the AI chat page, render standard responsive layout (mobile portrait or landscape)
+  // without forced 90deg rotation or touch/select blocking so typing and prompt bar work seamlessly
+  if (isChat) {
+    return (
+      <div id="auto-landscape-container" className="w-full h-full min-h-dvh relative overflow-hidden">
+        {children}
+      </div>
+    );
+  }
 
   // When mobile phone is in portrait orientation, automatically enforce landscape ratio
   // by rotating 90deg and sizing width=viewportHeight and height=viewportWidth

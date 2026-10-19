@@ -195,16 +195,19 @@ export default function ChatbotPage() {
     <main className="alif-chat" aria-label="Chat with Alif's virtual assistant">
       <style>{`
         .alif-chat {
+        :root {
           --chat-ink: #17223b;
           --chat-muted: #63708a;
           --chat-paper: #f8f7f0;
           --chat-sky: #dceeff;
           --chat-coral: #f2a184;
+        }
+        .alif-chat {
           position: relative;
           isolation: isolate;
           width: 100%;
-          height: 100%;
-          min-height: 100dvh;
+          height: 100dvh;
+          max-height: 100dvh;
           overflow: hidden;
           display: flex;
           align-items: center;
@@ -213,6 +216,7 @@ export default function ChatbotPage() {
           color: var(--chat-ink);
           background: #202c50;
           font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+          box-sizing: border-box;
         }
         .alif-chat *,
         .alif-chat *::before,
@@ -240,8 +244,9 @@ export default function ChatbotPage() {
           display: grid;
           grid-template-columns: minmax(230px, .73fr) minmax(0, 1.6fr);
           width: min(1200px, 100%);
-          height: min(800px, 100%);
-          min-height: 520px;
+          height: 100%;
+          max-height: 800px;
+          min-height: 0;
           overflow: hidden;
           border: 1px solid rgba(255,255,255,.46);
           border-radius: 30px;
@@ -291,6 +296,11 @@ export default function ChatbotPage() {
           gap: 10px;
           color: inherit;
           text-decoration: none;
+          background: none;
+          border: 0;
+          cursor: pointer;
+          padding: 0;
+          font: inherit;
         }
         .alif-chat__brand-mark {
           display: grid;
@@ -320,12 +330,12 @@ export default function ChatbotPage() {
           z-index: 1;
           margin-top: auto;
           margin-bottom: auto;
-          padding: 52px 0 20px;
+          padding: 36px 0 16px;
         }
         .alif-chat__story h1 {
           max-width: 330px;
           margin: 0;
-          font-size: clamp(36px, 4.3vw, 58px);
+          font-size: clamp(32px, 4vw, 54px);
           font-weight: 500;
           line-height: .99;
           letter-spacing: -.075em;
@@ -340,10 +350,10 @@ export default function ChatbotPage() {
         }
         .alif-chat__story-copy {
           max-width: 250px;
-          margin: 20px 0 0;
+          margin: 18px 0 0;
           color: #c4cfe5;
           font-size: 13px;
-          line-height: 1.75;
+          line-height: 1.7;
         }
         .alif-chat__orbit-note {
           position: relative;
@@ -364,6 +374,8 @@ export default function ChatbotPage() {
           flex-direction: column;
           min-width: 0;
           min-height: 0;
+          height: 100%;
+          overflow: hidden;
           background: rgba(250, 250, 246, .96);
         }
         .alif-chat__header {
@@ -372,22 +384,23 @@ export default function ChatbotPage() {
           align-items: center;
           justify-content: space-between;
           gap: 16px;
-          min-height: 82px;
-          padding: 17px clamp(18px, 3vw, 34px);
+          min-height: 68px;
+          padding: 14px clamp(18px, 3vw, 34px);
           border-bottom: 1px solid #e7e8e1;
-          background: rgba(255,255,252,.54);
+          background: rgba(255,255,252,.75);
+          backdrop-filter: blur(8px);
         }
         .alif-chat__heading { display: flex; align-items: center; gap: 13px; min-width: 0; }
         .alif-chat__avatar {
           position: relative;
           display: grid;
           flex: 0 0 auto;
-          width: 43px;
-          height: 43px;
+          width: 42px;
+          height: 42px;
           place-items: center;
           overflow: hidden;
           border: 1px solid #d6d9d0;
-          border-radius: 15px;
+          border-radius: 14px;
           color: #334768;
           background: linear-gradient(140deg, #e7f3f4, #e9e5f6);
         }
@@ -413,16 +426,16 @@ export default function ChatbotPage() {
           justify-content: center;
           gap: 7px;
           padding: 0 11px;
-          border: 1px solid transparent;
+          border: 1px solid #e2e4dd;
           border-radius: 12px;
           color: #58657d;
-          background: transparent;
+          background: #fffefa;
           font: inherit;
           font-size: 11px;
           cursor: pointer;
           transition: color .2s ease, background .2s ease, border-color .2s ease, transform .2s ease;
         }
-        .alif-chat__icon-button:hover { border-color: #e4e5dd; color: #243451; background: #f1f1ea; }
+        .alif-chat__icon-button:hover { border-color: #ccd1c7; color: #243451; background: #f1f1ea; }
         .alif-chat__icon-button:active { transform: translateY(1px); }
         .alif-chat__icon-button:focus-visible, .alif-chat__suggestion:focus-visible, .alif-chat__send:focus-visible, .alif-chat__textarea:focus-visible, .alif-chat__back:focus-visible, .alif-chat__confirm-button:focus-visible {
           outline: 3px solid rgba(80, 123, 174, .42);
@@ -430,15 +443,14 @@ export default function ChatbotPage() {
         }
         .alif-chat__feed {
           display: flex;
-          flex: 1 1 auto;
+          flex: 1 1 0;
           flex-direction: column;
-          gap: 22px;
+          gap: 20px;
           min-height: 0;
           overflow-y: auto;
-          padding: 30px clamp(18px, 3vw, 34px) 24px;
-          scroll-behavior: smooth;
           overscroll-behavior: contain;
-          touch-action: pan-y;
+          -webkit-overflow-scrolling: touch;
+          padding: 24px clamp(18px, 3vw, 34px) 16px;
         }
         .alif-chat__date-mark {
           display: flex;
@@ -469,7 +481,7 @@ export default function ChatbotPage() {
         }
         .alif-chat__bubble {
           max-width: min(580px, 83%);
-          padding: 15px 17px;
+          padding: 14px 17px;
           border: 1px solid #e5e7df;
           border-radius: 17px 17px 17px 5px;
           color: #354158;
@@ -495,11 +507,11 @@ export default function ChatbotPage() {
         }
         .alif-chat__suggestion {
           max-width: 100%;
-          padding: 9px 12px;
+          padding: 9px 13px;
           border: 1px solid #dfe3dd;
           border-radius: 999px;
           color: #53627b;
-          background: rgba(255,255,251,.78);
+          background: rgba(255,255,251,.85);
           font: inherit;
           font-size: 11px;
           text-align: left;
@@ -537,7 +549,9 @@ export default function ChatbotPage() {
         .alif-chat__end { height: 1px; flex: 0 0 auto; }
         .alif-chat__composer-wrap {
           flex: 0 0 auto;
-          padding: 0 clamp(18px, 3vw, 34px) 20px;
+          padding: 10px clamp(18px, 3vw, 34px) max(14px, env(safe-area-inset-bottom));
+          background: rgba(250, 250, 246, .98);
+          border-top: 1px solid rgba(231, 232, 225, 0.7);
         }
         .alif-chat__composer {
           display: flex;
@@ -547,7 +561,7 @@ export default function ChatbotPage() {
           border: 1px solid #dfe2db;
           border-radius: 18px;
           background: #fffefa;
-          box-shadow: 0 5px 20px rgba(34,46,71,.045);
+          box-shadow: 0 4px 16px rgba(34,46,71,.045);
           transition: border-color .2s ease, box-shadow .2s ease;
         }
         .alif-chat__composer:focus-within { border-color: #a8b9c4; box-shadow: 0 0 0 3px rgba(141,168,181,.13), 0 5px 20px rgba(34,46,71,.045); }
@@ -561,7 +575,7 @@ export default function ChatbotPage() {
           color: #293650;
           background: transparent;
           font: inherit;
-          font-size: 13px;
+          font-size: 14px;
           line-height: 1.6;
           user-select: text;
         }
@@ -586,7 +600,7 @@ export default function ChatbotPage() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin: 9px 2px 0;
+          margin: 8px 2px 0;
           color: #959ca5;
           font-family: "JetBrains Mono", ui-monospace, monospace;
           font-size: 9px;
@@ -618,44 +632,170 @@ export default function ChatbotPage() {
         .alif-chat__confirm-button--primary { border-color: #344766; color: #fff; background: #344766; }
         .alif-chat__confirm-button:hover { filter: brightness(.97); }
         .alif-chat :focus-visible { outline-offset: 3px; }
-        @media (max-width: 760px) {
-          .alif-chat { align-items: stretch; padding: 0; }
+
+        /* ── MOBILE SCREEN RATIO (Portrait & Narrow Screens <= 768px) ── */
+        @media (max-width: 768px) {
+          .alif-chat {
+            align-items: stretch;
+            padding: 0;
+            height: 100dvh;
+            max-height: 100dvh;
+          }
           .alif-chat__backdrop { background-position: 54% center; }
           .alif-chat__frame {
             width: 100%;
             height: 100%;
+            max-height: 100%;
             min-height: 0;
-            grid-template-columns: minmax(0, 1fr);
-            grid-template-rows: auto minmax(0, 1fr);
+            display: flex;
+            flex-direction: column;
             border: 0;
             border-radius: 0;
+            box-shadow: none;
           }
-          .alif-chat__side { min-height: 178px; padding: max(66px, calc(env(safe-area-inset-top) + 58px)) 20px 17px; }
-          .alif-chat__side::before { width: 185px; height: 185px; right: -93px; top: -58px; box-shadow: 0 0 0 17px rgba(208,226,255,.035), 0 0 0 39px rgba(208,226,255,.025); }
-          .alif-chat__side::after { top: 43px; right: 55px; width: 7px; height: 7px; }
-          .alif-chat__brand-mark { width: 31px; height: 31px; border-radius: 10px; }
-          .alif-chat__story { margin: 0; padding: 12px 0 0; }
-          .alif-chat__eyebrow { margin: 0 0 5px; font-size: 8px; }
-          .alif-chat__story h1 { max-width: none; font-size: clamp(25px, 7vw, 34px); line-height: 1.05; }
-          .alif-chat__story-copy, .alif-chat__orbit-note { display: none; }
-          .alif-chat__main { min-height: 0; }
-          .alif-chat__header { min-height: 67px; padding: 11px 15px; }
-          .alif-chat__avatar { width: 38px; height: 38px; border-radius: 13px; }
-          .alif-chat__icon-button { min-width: 36px; min-height: 36px; padding: 0 8px; }
-          .alif-chat__icon-button span { display: none; }
-          .alif-chat__feed { gap: 18px; padding: 22px 15px 18px; }
-          .alif-chat__bubble { max-width: 88%; padding: 12px 14px; font-size: 12px; }
-          .alif-chat__suggestions { margin-left: 0; gap: 7px; }
-          .alif-chat__suggestion { font-size: 10px; padding: 8px 10px; }
-          .alif-chat__error { margin-left: 0; }
-          .alif-chat__composer-wrap { padding: 0 13px max(12px, env(safe-area-inset-bottom)); }
-          .alif-chat__composer { padding: 8px 8px 8px 13px; border-radius: 16px; }
-          .alif-chat__send { width: 40px; height: 40px; }
-          .alif-chat__footnote { font-size: 8px; }
+          .alif-chat__side {
+            display: none;
+          }
+          .alif-chat__main {
+            flex: 1 1 auto;
+            height: 100%;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+          }
+          .alif-chat__header {
+            min-height: 56px;
+            padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+          }
+          .alif-chat__heading {
+            gap: 10px;
+          }
+          .alif-chat__avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 11px;
+          }
+          .alif-chat__heading h2 {
+            font-size: 13.5px;
+          }
+          .alif-chat__presence {
+            font-size: 10px;
+            margin: 2px 0 0;
+          }
+          .alif-chat__header-actions {
+            gap: 6px;
+          }
+          .alif-chat__icon-button {
+            min-width: 32px;
+            min-height: 32px;
+            padding: 0 8px;
+            font-size: 11px;
+            border-radius: 9px;
+            border: 1px solid #e2e4dd;
+            background: #fffefa;
+          }
+          .alif-chat__feed {
+            flex: 1 1 0;
+            min-height: 0;
+            gap: 14px;
+            padding: 14px 12px 10px;
+          }
+          .alif-chat__bubble {
+            max-width: 90%;
+            padding: 11px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+          }
+          .alif-chat__suggestions {
+            margin-left: 0;
+            gap: 6px;
+          }
+          .alif-chat__suggestion {
+            font-size: 10.5px;
+            padding: 7px 11px;
+          }
+          .alif-chat__error {
+            margin-left: 0;
+            padding: 8px 10px;
+          }
+          .alif-chat__composer-wrap {
+            flex: 0 0 auto;
+            padding: 8px 12px max(10px, env(safe-area-inset-bottom));
+          }
+          .alif-chat__composer {
+            padding: 6px 6px 6px 12px;
+            border-radius: 16px;
+            gap: 8px;
+          }
+          .alif-chat__textarea {
+            font-size: 15px;
+            line-height: 1.5;
+            max-height: 75px;
+          }
+          .alif-chat__send {
+            width: 38px;
+            height: 38px;
+          }
+          .alif-chat__footnote {
+            font-size: 8px;
+            margin: 5px 2px 0;
+          }
+          .alif-chat__footnote span:first-child {
+            display: none;
+          }
+        }
+
+        /* ── COMPACT HEIGHT SCREENS (Landscape mobile or short windows) ── */
+        @media (max-height: 600px) and (min-width: 769px) {
+          .alif-chat {
+            padding: 0;
+            height: 100dvh;
+            max-height: 100dvh;
+          }
+          .alif-chat__frame {
+            border-radius: 0;
+            border: 0;
+            height: 100%;
+            max-height: 100%;
+            min-height: 0;
+            grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1.45fr);
+          }
+          .alif-chat__side {
+            padding: 14px 18px;
+          }
+          .alif-chat__story {
+            padding: 6px 0;
+          }
+          .alif-chat__story h1 {
+            font-size: 22px;
+          }
+          .alif-chat__story-copy, .alif-chat__orbit-note {
+            display: none;
+          }
+          .alif-chat__header {
+            min-height: 48px;
+            padding: 8px 16px;
+          }
+          .alif-chat__feed {
+            padding: 10px 16px 8px;
+            gap: 10px;
+          }
+          .alif-chat__composer-wrap {
+            padding: 6px 16px max(8px, env(safe-area-inset-bottom));
+          }
+          .alif-chat__composer {
+            padding: 6px 6px 6px 12px;
+          }
+          .alif-chat__send {
+            width: 34px;
+            height: 34px;
+          }
+          .alif-chat__footnote {
+            display: none;
+          }
         }
         @media (max-width: 380px) {
-          .alif-chat__story h1 { font-size: 25px; }
-          .alif-chat__feed { padding-inline: 12px; }
+          .alif-chat__feed { padding-inline: 10px; }
           .alif-chat__composer-wrap { padding-inline: 10px; }
           .alif-chat__footnote span:last-child { display: none; }
         }
@@ -665,7 +805,6 @@ export default function ChatbotPage() {
             animation-duration: .01ms !important;
             animation-iteration-count: 1 !important;
             transition-duration: .01ms !important;
-          }
         }
       `}</style>
 

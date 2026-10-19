@@ -551,15 +551,17 @@ export default function App() {
   return (
     <MobileVirtualCursorProvider>
       {/* ── MOBILE ROTATION PROMPT (Default native phone orientation, NOT rotated) ── */}
-      <MobileLandscapeNotice onDismiss={handleRotationDismiss} />
+      {pathname !== '/chat' && (
+        <MobileLandscapeNotice onDismiss={handleRotationDismiss} />
+      )}
 
       {/* ── AUTOMATIC LANDSCAPE CONTAINER (All pages rendered in desktop landscape ratio) ── */}
       <AutoLandscapeWrapper>
-        <CustomCursor />
-        <VirtualCursorPad />
-        <MobileVirtualCursorOverlay />
-        <MobileCursorModeSwitchOverlay />
-        <GlobalChatButton />
+        {pathname !== '/chat' && <CustomCursor />}
+        {pathname !== '/chat' && <VirtualCursorPad />}
+        {pathname !== '/chat' && <MobileVirtualCursorOverlay />}
+        {pathname !== '/chat' && <MobileCursorModeSwitchOverlay />}
+        {pathname !== '/chat' && <GlobalChatButton />}
         <AnimatePresence>
           {!isRotationNoticeActive && initialLoading && pathname !== '/chat' && (
             <LoadingScreen onComplete={() => setInitialLoading(false)} />
