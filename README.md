@@ -1,27 +1,117 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# Welcome to the repository of `YOUR_REPOSITORY_NAME`
 
-This contains everything you need to run your app locally.
+<p align="center">
+  <img src="https://img.shields.io/badge/ZENOX-DEVELOPMENT-8B5CF6?style=for-the-badge&labelColor=09090B" alt="Zenox Development" />
+</p>
 
-View your app in AI Studio: https://ai.studio/apps/e4ee0c07-6416-4392-8f39-d8041ebf50b4
+<p align="center">
+  <strong>Turning creative ideas into digital experiences.</strong>
+  <br />
+  <sub>Design • Development • Innovation</sub>
+</p>
 
-## Run Locally
+<p align="center">
+  <a href="https://imalif.onrender.com">
+    <img src="https://img.shields.io/badge/PORTFOLIO-Visit%20Website-8B5CF6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Portfolio" />
+  </a>
+  <img src="https://img.shields.io/badge/LICENSE-Proprietary-DC4568?style=for-the-badge&logo=creativecommons&logoColor=white" alt="Proprietary License" />
+</p>
 
-**Prerequisites:**  Node.js
+---
 
+## ✦ About Me
 
-1. Install dependencies:
-   `npm install`
-2. Set `AI_API` to your Gemini API key in Replit Secrets or your untracked local `.env.local` file. Do not prefix it with `VITE_`.
-3. Run the app:
-   `npm run dev`
+Hey there! I'm **Alif**, also known as **Zenox**, a developer from **Bangladesh** passionate about building creative, modern, and functional digital experiences.
 
-## Deploy to Render
+I love turning ideas into reality through clean code, thoughtful design, smooth interactions, and innovative technology.
 
-This app deploys as a **[Render](https://render.com) Node Web Service** so the portfolio and private Gemini chat endpoint can run in one service. Set `AI_API` in Render's service environment; Replit secrets are not copied to Render.
+### What I Build
 
-- For 1-click blueprint deployment or step-by-step dashboard instructions, see the complete guide: **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)**.
-- A ready-to-use `render.yaml` Blueprint file is included in the project root.
+- **Frontend Development** — Modern interfaces, responsive layouts, and interactive user experiences.
+- **Full-Stack Web Apps** — Complete web applications with frontend and backend functionality.
+- **Mobile Applications** — Functional and engaging applications for mobile devices.
+- **Creative Websites** — Cinematic, animated, immersive, and interactive web experiences.
+- **UI/UX Implementation** — Turning design concepts into polished, user-friendly products.
+
+My focus is on creating digital products that are not only functional but also memorable.
+
+---
+
+## ↗ My Portfolio
+
+<p align="center">
+  <a href="https://imalif.onrender.com">
+    <img src="https://img.shields.io/badge/EXPLORE%20MY%20WORK-8B5CF6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Explore My Portfolio" />
+  </a>
+</p>
+
+<p align="center">
+  Discover my projects, creative experiments, and development journey.
+  <br />
+  <a href="https://imalif.onrender.com"><strong>imalif.onrender.com →</strong></a>
+</p>
+
+---
+
+## ⌘ Repository Information
+
+This repository is part of my development journey. It contains project code and related resources provided for limited personal testing and evaluation.
+
+> **Important:** This is proprietary software, not an open-source project. Public visibility does not grant permission to freely reuse, redistribute, or deploy the code.
+
+---
+
+## © Copyright & License
+
+**Copyright © 2026 Zenox Development. All rights reserved.**
+
+You may view, download, and run this repository **locally for personal testing and evaluation only**.
+
+Without prior written permission from Zenox Development, you may not:
+
+- Deploy or host the project online, including on Vercel, Netlify, Render, GitHub Pages, or other platforms.
+- Redistribute, resell, republish, or distribute modified versions of the source code.
+- Rebrand the project or claim it as your own.
+- Use the project for commercial purposes.
+
+All rights not expressly granted are reserved. Third-party components remain subject to their respective licenses.
+
+The software is provided **"AS IS"**, without warranties to the maximum extent permitted by law.
+
+Need additional permissions? Contact me before using the project beyond the terms above.
+
+---
+
+## ◈ Connect With Me
+
+Have a creative idea, a collaboration proposal, or just want to connect? Feel free to reach out!
+
+<p>
+  <a href="https://imalif.onrender.com">
+    <img src="https://img.shields.io/badge/Portfolio-8B5CF6?style=flat-square&logo=googlechrome&logoColor=white" alt="Portfolio" />
+  </a>
+  <a href="https://wa.me/01911171635">
+    <img src="https://img.shields.io/badge/WhatsApp-25D366?style=flat-square&logo=whatsapp&logoColor=white" alt="WhatsApp" />
+  </a>
+  <a href="https://discord.com">
+    <img src="https://img.shields.io/badge/Discord-alifop24_-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" />
+  </a>
+</p>
+
+| Details | Information |
+|:--|:--|
+| **Developer** | Alif / Zenox |
+| **Brand** | Zenox Development |
+| **Country** | Bangladesh |
+| **Portfolio** | [Visit Website](https://imalif.onrender.com) |
+| **WhatsApp** | [01911171635](https://wa.me/01911171635) |
+| **Discord** | `alifop24_` |
+
+---
+
+<p align="center">
+  <strong>Built with curiosity. Crafted with purpose.</strong>
+  <br /><br />
+  <sub>This repository under copyright © by Zenox Development. 2026</sub>
+</p>
